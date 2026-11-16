@@ -162,7 +162,7 @@ export class HUD {
   /** Tuck strength drives the speed-line overlay. */
   setTuck(amount, speed = 0) {
     const a = Math.max(0, Math.min(1, amount)) * Math.min(1, Math.max(0, (speed - 12) / 26));
-    if (this.el.speedlines) this.el.speedlines.style.opacity = (a * 0.17).toFixed(3);
+    if (this.el.speedlines) this.el.speedlines.style.opacity = (a * 0.12).toFixed(3);
   }
 
   /** Kept for the progress read-out in the old layout (no longer drawn). */

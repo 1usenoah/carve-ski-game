@@ -366,6 +366,7 @@ function finishRun() {
   }
   hud.showHUD(false);
   hud.showTouch(false);
+  hud.setTuck(0, 0);
   S.state = 'result';
 }
 
@@ -375,6 +376,7 @@ function toMenu() {
   hud.showResult(false);
   hud.showHUD(false);
   hud.showTouch(false);
+  hud.setTuck(0, 0);
   hud.showTitle(true);
   updateTitleInfo();
 }
