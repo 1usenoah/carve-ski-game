@@ -92,10 +92,14 @@ const input = { left: false, right: false, axis: null, tuck: false, brake: false
 const touch = new TouchControls(input);
 const chase = new ChaseCamera(camera);
 
-const BUILD = 'v2.1.0';
+const BUILD = 'v2.2.0';
 
-// Medal times the course setter aimed at (seconds over 16 gates).
-const TARGETS = { gold: 48, silver: 56, bronze: 66 };
+// FIS giant-slalom set: 28 gates over the 1 km piste, turning poles 16–22 m
+// apart across the fall line, 34–41 m between gates.
+const GATE_COUNT = 28;
+
+// Medal times the course setter aimed at.
+const TARGETS = { gold: 66, silver: 74, bronze: 84 };
 const S = {
   state: 'loading',           // loading | menu | countdown | running | paused | result
   runMode: 'race',
@@ -104,6 +108,7 @@ const S = {
   cdT: 0,
   cdLast: 99,
   prevZ: START_Z,
+  prevX: 0,
   clean: 0,
   missed: 0,
   gateIndex: 0,
@@ -193,7 +198,7 @@ async function buildWorld(mapId, mode, { silent = false } = {}) {
   scene.add(ctx.sky.group);
 
   if (mode === 'race') {
-    ctx.gates = new Gates(scene, terrain, def, 16, {
+    ctx.gates = new Gates(scene, terrain, def, GATE_COUNT, {
       onHit: (pos, gate, pole, force) => {
         ctx.effects?.poleHit(pos, force);
         audio.gateHit(force);
@@ -266,6 +271,7 @@ async function startRun(mode = S.runMode) {
   S.cdT = 3.0;
   S.cdLast = 99;
   S.prevZ = START_Z;
+  S.prevX = ctx.physics.x;
   S.bestAtStart = leaderboard.getBest(ctx.def.id, 'race');
   S.ghostRec = [];
   S.ghostAcc = 0;
@@ -307,7 +313,7 @@ async function startRun(mode = S.runMode) {
   hud.setSpeed(0);
   hud.setAirtime(0);
   hud.setProgress(0);
-  hud.setGate(0, mode === 'race' ? 16 : 0);
+  hud.setGate(0, mode === 'race' ? GATE_COUNT : 0);
   hud.showGateCounter(mode === 'race');
   if (touch.isTouch || window.innerWidth < 820) hud.showTouch(true);
   S.state = 'countdown';
@@ -341,7 +347,7 @@ function finishRun() {
       best,
       diff: prevBest == null ? null : time - prevBest,
       clean: S.clean,
-      total: 16 - S.missed,
+      total: GATE_COUNT - S.missed,
       topSpeed: ctx.physics.maxSpeed * 3.6,
     });
     audio.finish();
@@ -455,44 +461,40 @@ function tick(dt) {
   const p = ctx.physics;
   S.time += dt;
   const prevZ = S.prevZ;
+  const prevX = S.prevX;
   if (S.autopilot) autopilotInput(p);
   p.update(dt, input);
   S.prevZ = p.z;
+  S.prevX = p.x;
 
   // ── gates ──
+  // A gate is passed when the skier crosses the gate line between the
+  // turning pole (inside, the one they brush) and the outside pole.
   if (ctx.gates) {
-    const g = ctx.gates.gateAtZ(prevZ, p.z);
-    if (g) {
-      const h = t.headingAt(g.z);
-      const lateral = (p.x - g.x) * Math.cos(h) + (p.z - g.z) * Math.sin(h);
-      const ratio = Math.abs(lateral) / g.halfW;
-      if (ratio > 1.12) {
+    const res = ctx.gates.judgeStep(prevX, prevZ, p.x, p.z);
+    if (res) {
+      const g = res.gate;
+      S.gateIndex = ctx.gates.current;
+      if (res.missed) {
         S.missed += 1;
         S.penalty += 2;
-        ctx.gates.pass(g.index, 999);
-        hud.judge({ label: 'MISSED GATE', tone: 'wide', sub: '+2.00s PENALTY' });
+        hud.judge({ label: 'MISSED GATE', tone: 'wide', sub: `${res.reason} · +2.00s` });
         audio.tone(220, 0.3, 'sawtooth', 0.1);
-        S.gateIndex = ctx.gates.current;
       } else {
-        const res = ctx.gates.pass(g.index, lateral);
-        S.gateIndex = ctx.gates.current;
-        if (res) {
-          if (res.clean) S.clean += 1;
-          const sub = `${Math.abs(lateral).toFixed(2)}m ${lateral < 0 ? 'LEFT' : 'RIGHT'} · ${res.ratio < 0.16 ? 'CENTER' : 'EDGE'}`;
-          hud.judge({ label: res.label, tone: res.tone, sub });
-          audio.gate(res.tone === 'perfect');
-          ctx.effects.gateBurst(tmpV.set(g.x, g.y + 0.4, g.z), g.color, res.clean ? 30 : 16);
-          if (res.tone === 'perfect' || res.tone === 'clean') p.speed += 0.4;
-        }
+        if (res.clean) S.clean += 1;
+        hud.judge({
+          label: res.label,
+          tone: res.tone,
+          sub: `${res.s.toFixed(2)} m off the turning pole`,
+        });
+        audio.gate(res.tone === 'perfect');
+        ctx.effects.gateBurst(tmpV.set(g.tx, g.y + 0.4, g.tz), g.color, res.clean ? 30 : 16);
+        if (res.clean) p.speed += 0.4;
       }
-      hud.setGate(S.gateIndex, 16);
-      hud.setProgress((START_Z - p.z) / (START_Z - FINISH_Z));
-    } else {
-      hud.setProgress((START_Z - p.z) / (START_Z - FINISH_Z));
+      hud.setGate(S.gateIndex, GATE_COUNT);
     }
-  } else {
-    hud.setProgress((START_Z - p.z) / (START_Z - FINISH_Z));
   }
+  hud.setProgress((START_Z - p.z) / (START_Z - FINISH_Z));
 
   // ── rider pose ──
   const airT = p.airborne ? 1 : 0;
@@ -569,23 +571,28 @@ function autopilotInput(p) {
   let tz;
   const gp = ctx.gates?.guidePoints;
   if (gp && gp.length > 6) {
-    // pure pursuit along the carved line: nearest sample, then look ahead
+    // pure pursuit along the carved line: nearest sample, then look ahead by
+    // a distance along the line so uneven sampling can't collapse the target
     let bi = 0;
     let bd = Infinity;
     for (let i = 0; i < gp.length; i++) {
       const d = (gp[i].x - p.x) ** 2 + (gp[i].z - p.z) ** 2;
       if (d < bd) { bd = d; bi = i; }
     }
-    const spacing = Math.max(0.6, Math.abs(gp[1].z - gp[0].z) || 1.5);
-    const ahead = Math.round((7 + p.speed * 0.26) / spacing);
-    const t = gp[Math.min(gp.length - 1, bi + ahead)];
-    tx = t.x;
-    tz = t.z;
+    let ti = bi;
+    let run = 0;
+    const reach = 5.6 + p.speed * 0.17;
+    while (ti < gp.length - 1 && run < reach) {
+      run += Math.hypot(gp[ti + 1].x - gp[ti].x, gp[ti + 1].z - gp[ti].z);
+      ti++;
+    }
+    tx = gp[ti].x;
+    tz = gp[ti].z;
   } else {
     const g = ctx.gates?.list[ctx.gates.current];
     if (g) {
-      tx = g.x;
-      tz = g.z;
+      tx = g.tx;
+      tz = g.tz;
     } else {
       tz = p.z - 55;
       tx = ctx.terrain.centerX(tz);
@@ -597,10 +604,33 @@ function autopilotInput(p) {
   let err = want - p.heading;
   while (err > Math.PI) err -= Math.PI * 2;
   while (err < -Math.PI) err += Math.PI * 2;
-  input.axis = clamp(err * 3.2, -1, 1);
+  input.axis = clamp(err * 3.9, -1, 1);
   input.left = input.right = false;
   input.tuck = Math.abs(err) < 0.13;
-  input.brake = false;
+  // scrub speed when the next arc needs more edge than the ski can hold
+  let vmax = 34;
+  const gp2 = ctx.gates?.guidePoints;
+  if (gp2 && gp2.length > 12) {
+    let bi = 0;
+    let bd = Infinity;
+    for (let i = 0; i < gp2.length; i++) {
+      const d = (gp2[i].x - p.x) ** 2 + (gp2[i].z - p.z) ** 2;
+      if (d < bd) { bd = d; bi = i; }
+    }
+    const a = gp2[bi];
+    const b = gp2[Math.min(gp2.length - 1, bi + 22)];
+    if (b && a) {
+      const ds = Math.hypot(b.x - a.x, b.z - a.z);
+      const ha = Math.atan2(a.x - p.x, -(a.z - p.z));
+      const hb = Math.atan2(b.x - a.x, -(b.z - a.z));
+      let dh = hb - ha;
+      while (dh > Math.PI) dh -= Math.PI * 2;
+      while (dh < -Math.PI) dh += Math.PI * 2;
+      const R = Math.abs(dh) > 0.02 ? ds / Math.abs(dh) : 400;
+      vmax = Math.sqrt(23.4 * Math.max(6, R));
+    }
+  }
+  input.brake = p.speed > vmax * 1.03;
 }
 
 function updateGhost() {
@@ -875,6 +905,8 @@ window.__carve = {
     crouch: +ctx.rider.crouchSmooth.toFixed(2),
     airborne: ctx.physics.airborne,
     gate: ctx.gates ? ctx.gates.current : 0,
+    gateTotal: ctx.gates ? ctx.gates.list.length : 0,
+    gates: ctx.gates ? ctx.gates.debug().gates.slice(0, 3) : null,
     clean: S.clean,
     missed: S.missed,
     lean: +ctx.rider.leanSmooth.toFixed(2),
@@ -913,9 +945,11 @@ window.__carve = {
     p.y = ctx.terrain.heightAt(p.x, p.z);
     p.heading = ctx.terrain.headingAt(z);
     S.prevZ = z + 1;
+    S.prevX = p.x;
     chase.snap(p);
     return window.__carve.state();
   },
+  gateDebug: () => (ctx.gates ? ctx.gates.debug() : null),
   openShop: () => { openShop(); return true; },
   closeShop: () => { closeShop(); return true; },
   finish: () => finishRun(),

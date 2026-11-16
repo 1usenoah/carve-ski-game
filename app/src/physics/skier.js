@@ -3,7 +3,7 @@ import { clamp, damp, lerp } from '../core/noise.js';
 import { PISTE_HALF, START_Z } from '../scene/terrain.js';
 
 const G = 9.81;
-const MAX_EDGE = 1.12;          // ~64° of edge angle
+const MAX_EDGE = 1.19;          // ~68° of edge angle: a GS arc at WC speed
 const STEER_DAMP = 9.6;         // how fast the steering input reaches full lock
 const EDGE_DAMP = 9.0;          // how fast the ski rolls onto its edge
 const TUCK_DAMP = 5.0;          // body drop into the aero tuck
@@ -104,7 +104,7 @@ export class SkierPhysics {
 
     // ── carve: heading changes at g·tan(edge)/v ──
     let omega = (G * Math.tan(this.edge)) / Math.max(this.speed, 3.4);
-    omega = clamp(omega, -1.7, 1.7);
+    omega = clamp(omega, -1.85, 1.85);
     if (!this.airborne) {
       this.heading += omega * dt;
     } else {
