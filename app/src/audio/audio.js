@@ -11,6 +11,7 @@ export class AudioEngine {
     this.ready = false;
     this.enabled = true;
     this.lastGate = 0;
+    this.lastHit = 0;
   }
 
   init() {
@@ -139,6 +140,21 @@ export class AudioEngine {
     this.lastGate = now;
     this.tone(perfect ? 1320 : 990, 0.13, 'sine', 0.2);
     this.tone(perfect ? 1980 : 1480, 0.2, 'triangle', 0.09);
+  }
+
+  /**
+   * A gate pole taking a hit: a plasticky knock plus the hollow ring of the
+   * panel, so brushing a pole is heard as well as seen.
+   */
+  gateHit(force = 1) {
+    if (!this.ready) return;
+    const now = this.ctx.currentTime;
+    if (now - this.lastHit < 0.06) return;
+    this.lastHit = now;
+    const v = clamp(force, 0.3, 1.8);
+    this.burst(0.1, 2600 + v * 700, 0.1 + v * 0.12);
+    this.tone(210 + v * 40, 0.09, 'square', 0.05 * v, 120);
+    this.tone(430 + v * 60, 0.2, 'triangle', 0.045 * v, 320);
   }
 
   countdown(step) {

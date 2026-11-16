@@ -15,6 +15,9 @@ const _shoulders = new THREE.Vector3();
 const _chest = new THREE.Vector3();
 const _back = new THREE.Vector3();
 const _neg = new THREE.Vector3();
+const _t1 = new THREE.Vector3();
+const _t2 = new THREE.Vector3();
+const _hand = new THREE.Vector3();
 
 function limbGeometry(radius, length, radial = 10) {
   const geo = new THREE.CapsuleGeometry(radius, Math.max(0.01, length - radius * 2), 5, radial);
@@ -363,16 +366,21 @@ export class Rider {
 
     const cosL = Math.cos(L);
     const sinL = Math.sin(L);
-    const pitch = 0.14 + crouch * 0.5 + this.airTuck * 0.3;
+    // tuck: 0 = normal stance, 1 = flat-out aero crouch
+    const tuck = clamp((crouch - 0.4) / 0.6, 0, 1);
+    const tuckEase = tuck * tuck * (3 - 2 * tuck);
+    this.tuckAmt = tuckEase;
+    // ~82° of forward pitch at full tuck: chest almost level with the snow
+    const pitch = 0.14 + crouch * 0.34 + tuckEase * 0.95 + this.airTuck * 0.3;
     const twist = clamp(-L * 0.3, -0.26, 0.26);
 
     // ── hips: angulated, only slightly displaced toward the inside ──
-    const hipY = 0.98 - crouch * 0.18 - squash - this.airTuck * 0.05;
+    const hipY = 0.98 - crouch * 0.14 - tuckEase * 0.34 - squash - this.airTuck * 0.05;
     const hipTilt = L * 0.34;
     const hips = _hips.set(
       Math.sin(hipTilt) * hipY * 0.72,
       Math.cos(hipTilt) * hipY,
-      0.02 + crouch * 0.07
+      0.02 + crouch * 0.05 + tuckEase * 0.09
     );
 
     // ── shoulders: torso pitched forward and tipped deep into the arc ──
@@ -413,11 +421,13 @@ export class Rider {
 
     // ── head: positioned on the shoulders, counter-tilted slightly ──
     const headPos = _c.copy(shoulders);
-    headPos.y += 0.1;
-    headPos.z += -0.005;
+    headPos.y += 0.1 - tuckEase * 0.088;
+    headPos.z += -0.005 - tuckEase * 0.07;
     this.head.position.copy(headPos);
+    // in the tuck the torso is nearly horizontal, so the neck lifts the face
+    // back up to look down the course instead of into the snow
     this.head.rotation.set(
-      pitch * 0.3 - this.airTuck * 0.1,
+      pitch * 0.3 - this.airTuck * 0.1 - tuckEase * 0.74,
       -twist * 0.7 + Math.sin(this.time * 1.3) * 0.02 * moving,
       -L * 0.42
     );
@@ -498,27 +508,36 @@ export class Rider {
         shoulders.z + 0.005
       );
 
-      // upper arm hangs down, slightly forward, elbows soft
+      // upper arm hangs down, slightly forward, elbows soft — and in the tuck
+      // the elbows pull in against the ribs, forearms level in front of the chest
       _dir.set(side * (0.3 + 0.12 * (1 - crouch)), -0.92, -0.24 - reach * 0.3).normalize();
       _dir.applyAxisAngle(_zAxis, L * 0.45);
+      _t1.set(side * 0.18, -0.88, -0.16).normalize();
+      _dir.lerp(_t1, tuckEase * 0.92).normalize();
       const elbow = _a.copy(shoulder).addScaledVector(_dir, arm.upperLen);
       this.placeLimb(arm.upper, shoulder, elbow);
 
       // forearm reaches forward for the pole plant
-      _b.set(side * 0.16, -0.5, -0.86 - reach * 0.15).normalize();
+      _b.set(side * 0.14, -0.72, -0.62 - reach * 0.12).normalize();
       _b.applyAxisAngle(_zAxis, L * 0.4);
+      _t2.set(side * 0.06, -0.2, -0.98).normalize();
+      _b.lerp(_t2, tuckEase * 0.92).normalize();
       if (grab > 0.01) {
         _b.lerp(_neg.set(side * 0.5, -1.0, -0.2).normalize(), grab);
       }
-      const hand = _a.copy(elbow).addScaledVector(_b, arm.foreLen);
+      const hand = _hand.copy(elbow).addScaledVector(_b, arm.foreLen);
       arm.fore.position.copy(elbow);
       arm.fore.quaternion.setFromUnitVectors(DOWN, _b);
       arm.hand.position.copy(hand);
       arm.hand.rotation.set(_b.z * 0.7, 0, -_b.x * 0.7);
 
-      // pole trails back under the arm
+      // pole trails back under the arm; in the tuck it lies flat along the body
       arm.pole.position.copy(hand);
       _b.set(side * 0.12, 0.2 + crouch * 0.1, 1.0).normalize();
+      if (tuckEase > 0.001) {
+        _t2.set(side * 0.05, 0.03, 1.0).normalize();
+        _b.lerp(_t2, tuckEase).normalize();
+      }
       _b.applyAxisAngle(_zAxis, L * 0.35);
       arm.pole.quaternion.setFromUnitVectors(DOWN, _b);
     }

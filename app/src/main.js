@@ -88,11 +88,14 @@ const store = new StoreService();
 const leaderboard = new LeaderboardService();
 const hud = new HUD();
 const audio = new AudioEngine();
-const input = { left: false, right: false, tuck: false, brake: false, jump: false };
+const input = { left: false, right: false, axis: null, tuck: false, brake: false, jump: false, allowJump: true };
 const touch = new TouchControls(input);
 const chase = new ChaseCamera(camera);
 
-const BUILD = 'v2.0.4';
+const BUILD = 'v2.1.0';
+
+// Medal times the course setter aimed at (seconds over 16 gates).
+const TARGETS = { gold: 48, silver: 56, bronze: 66 };
 const S = {
   state: 'loading',           // loading | menu | countdown | running | paused | result
   runMode: 'race',
@@ -190,7 +193,12 @@ async function buildWorld(mapId, mode, { silent = false } = {}) {
   scene.add(ctx.sky.group);
 
   if (mode === 'race') {
-    ctx.gates = new Gates(scene, terrain, def, 16);
+    ctx.gates = new Gates(scene, terrain, def, 16, {
+      onHit: (pos, gate, pole, force) => {
+        ctx.effects?.poleHit(pos, force);
+        audio.gateHit(force);
+      },
+    });
   }
 
   ctx.physics = new SkierPhysics(terrain, def);
@@ -247,6 +255,9 @@ async function startRun(mode = S.runMode) {
     S.state = 'menu';
   }
   S.runMode = mode;
+  input.allowJump = mode === 'park';
+  input.jump = false;
+  input.axis = null;
   S.time = 0;
   S.penalty = 0;
   S.clean = 0;
@@ -286,6 +297,12 @@ async function startRun(mode = S.runMode) {
   hud.showShop(false);
   hud.showHUD(true);
   hud.setRunInfo(mode, mode === 'race' ? ctx.def.name : `${ctx.def.name} · PARK`);
+  hud.setCourseTargets({
+    gold: TARGETS.gold,
+    silver: TARGETS.silver,
+    bronze: TARGETS.bronze,
+    best: leaderboard.getBest(ctx.def.id, 'race'),
+  });
   hud.setTime(0);
   hud.setSpeed(0);
   hud.setAirtime(0);
@@ -312,10 +329,10 @@ function finishRun() {
     const best = res.best;
     let medal = '🏔️';
     let title = 'FINISHED';
-    if (time <= 48) { medal = '🥇'; title = 'GOLD MEDAL'; }
-    else if (time <= 56) { medal = '🥈'; title = 'SILVER MEDAL'; }
-    else if (time <= 66) { medal = '🥉'; title = 'BRONZE MEDAL'; }
-    else if (time <= 80) { medal = '🎖️'; title = 'FINISHER'; }
+    if (time <= TARGETS.gold) { medal = '🥇'; title = 'GOLD MEDAL'; }
+    else if (time <= TARGETS.silver) { medal = '🥈'; title = 'SILVER MEDAL'; }
+    else if (time <= TARGETS.bronze) { medal = '🥉'; title = 'BRONZE MEDAL'; }
+    else if (time <= TARGETS.bronze + 14) { medal = '🎖️'; title = 'FINISHER'; }
     hud.showResultData({
       medal,
       title,
@@ -388,6 +405,9 @@ const tmpV = new THREE.Vector3();
 function tick(dt) {
   const t = ctx.terrain;
   if (!t) return;
+  // the world can be mid-rebuild (mode / map switch): hold the frame, the
+  // render loop keeps running while the new piste is assembled
+  if (!ctx.physics || !ctx.rider) return;
   ctx.sky?.update(camera, dt);
 
   if (S.state === 'menu' || S.state === 'result') {
@@ -528,29 +548,46 @@ function tick(dt) {
   updateGhost();
 
   // ── hud ──
-  hud.setTime(S.time + S.penalty, S.bestAtStart ? null : null);
+  hud.setTime(S.time + S.penalty, S.bestAtStart != null && S.time > 0.2 ? S.bestAtStart : null);
   hud.setSpeed(p.speed * 3.6);
   hud.setAirtime(p.airborne ? p.airTime : 0);
+  hud.setTuck(p.tuckAmt ?? 0, p.speed);
   audio.update(p);
 
   chase.update(dt, p);
   ctx.world.update(dt, camera.position, p);
-  ctx.gates?.update(dt);
+  ctx.gates?.update(dt, p);
 
   if (p.z <= FINISH_Z) finishRun();
 }
 
-/** Test-only autopilot: steers at the next gate so screenshots show real lines. */
+/** Test-only autopilot: follows the dashed racing line so screenshots show real lines. */
 function autopilotInput(p) {
   let tx;
   let tz;
-  const g = ctx.gates?.list[ctx.gates.current];
-  if (g) {
-    tx = g.x;
-    tz = g.z;
+  const gp = ctx.gates?.guidePoints;
+  if (gp && gp.length > 6) {
+    // pure pursuit along the carved line: nearest sample, then look ahead
+    let bi = 0;
+    let bd = Infinity;
+    for (let i = 0; i < gp.length; i++) {
+      const d = (gp[i].x - p.x) ** 2 + (gp[i].z - p.z) ** 2;
+      if (d < bd) { bd = d; bi = i; }
+    }
+    const spacing = Math.max(0.6, Math.abs(gp[1].z - gp[0].z) || 1.5);
+    const ahead = Math.round((7 + p.speed * 0.26) / spacing);
+    const t = gp[Math.min(gp.length - 1, bi + ahead)];
+    tx = t.x;
+    tz = t.z;
   } else {
-    tz = p.z - 55;
-    tx = ctx.terrain.centerX(tz);
+    const g = ctx.gates?.list[ctx.gates.current];
+    if (g) {
+      tx = g.x;
+      tz = g.z;
+    } else {
+      tz = p.z - 55;
+      tx = ctx.terrain.centerX(tz);
+    }
   }
   const dx = tx - p.x;
   const dz = tz - p.z;
@@ -558,9 +595,9 @@ function autopilotInput(p) {
   let err = want - p.heading;
   while (err > Math.PI) err -= Math.PI * 2;
   while (err < -Math.PI) err += Math.PI * 2;
-  input.left = err < -0.035;
-  input.right = err > 0.035;
-  input.tuck = Math.abs(err) < 0.22;
+  input.axis = clamp(err * 3.2, -1, 1);
+  input.left = input.right = false;
+  input.tuck = Math.abs(err) < 0.13;
   input.brake = false;
 }
 
@@ -624,6 +661,8 @@ const keyMap = {
   KeyD: 'right',
   ArrowUp: 'tuck',
   KeyW: 'tuck',
+  ShiftLeft: 'tuck',
+  ShiftRight: 'tuck',
   ArrowDown: 'brake',
   KeyS: 'brake',
   Space: 'jump',
@@ -650,8 +689,9 @@ window.addEventListener('keydown', (e) => {
   const k = keyMap[e.code];
   if (!k) return;
   e.preventDefault();
+  // Race runs have no jump at all: Space is simply not an input there
+  if (k === 'jump' && S.runMode === 'race') return;
   input[k] = true;
-  if (k === 'jump') input.jump = true;
   audio.init();
 });
 window.addEventListener('keyup', (e) => {
@@ -719,8 +759,20 @@ $('btnShopHud').onclick = () => { audio.click(); openShop(); };
 $('btnShopClose').onclick = () => { audio.click(); closeShop(); };
 $('btnHelp').onclick = () => {
   audio.click();
-  hud.toast('← → 카빙 · ↑ 턱 · ↓ 브레이크 · SPACE 점프 · ESC 일시정지 · M 음소거');
+  hud.toast(
+    touch.isTouch
+      ? '화면을 좌우로 드래그해 카빙 · 아래로 스와이프하면 브레이크 · CROUCH 홀드'
+      : '← → 카빙 · ↑/SHIFT 턱 · ↓ 브레이크 · ESC 일시정지 · M 음소거'
+  );
 };
+const fullBtn = $('btnFull');
+if (fullBtn) {
+  fullBtn.onclick = () => {
+    audio.click();
+    if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+    else document.exitFullscreen?.().catch(() => {});
+  };
+}
 $('btnPause').onclick = () => { audio.click(); pauseRun(); };
 $('btnResume').onclick = () => { audio.click(); resumeRun(); };
 $('btnRestart').onclick = () => { audio.click(); hud.showPause(false); startRun(S.runMode); };
@@ -768,7 +820,9 @@ async function boot() {
     setTimeout(() => {
       if (S.state === 'menu') {
         hud.toast(
-          touch.isTouch ? '화면 버튼으로 카빙하세요' : '← → 로 카빙, ↑ 턱, SPACE 점프'
+          touch.isTouch
+            ? '좌우로 드래그해 카빙하세요'
+            : '← → 로 카빙, ↑ 턱 (RACE에는 점프 없음)'
         );
       }
     }, 1200);
@@ -814,12 +868,19 @@ window.__carve = {
     z: +ctx.physics.z.toFixed(2),
     speed: +(ctx.physics.speed * 3.6).toFixed(1),
     edge: +ctx.physics.edge.toFixed(2),
+    steer: +ctx.physics.steer.toFixed(2),
+    tuck: +(ctx.physics.tuckAmt ?? 0).toFixed(2),
+    crouch: +ctx.rider.crouchSmooth.toFixed(2),
     airborne: ctx.physics.airborne,
     gate: ctx.gates ? ctx.gates.current : 0,
     clean: S.clean,
     missed: S.missed,
     lean: +ctx.rider.leanSmooth.toFixed(2),
     map: ctx.def?.id,
+    jumpVisible: (() => {
+      const el = document.getElementById('tJump');
+      return el ? getComputedStyle(el).display !== 'none' : null;
+    })(),
     drawCalls: renderer.info.render.calls,
     triangles: renderer.info.render.triangles,
   }),
@@ -835,6 +896,7 @@ window.__carve = {
     S.frozen = !!v;
   },
   setInput: (obj) => Object.assign(input, obj),
+  inputState: () => ({ ...input }),
   autopilot: (on) => {
     S.autopilot = !!on;
     return S.autopilot;
@@ -876,12 +938,15 @@ window.__carve = {
     return true;
   },
   render: () => { renderFrame(); renderFrame(); return true; },
-  poseRider: ({ lean = 0, crouch = 0.28, air = 0, steer = 0, grab = 0 } = {}) => {
+  poseRider: ({ lean = 0, crouch = 0.28, air = 0, steer = 0, grab = 0, speed = 20, settle = 1.2 } = {}) => {
     const p = ctx.physics;
     ctx.rider.place(new THREE.Vector3(p.x, p.y, p.z), p.heading);
-    ctx.rider.update(0.25, { lean, crouch, air, steer, grab, speed: 20, land: false });
+    const steps = Math.max(1, Math.round(settle / 0.04));
+    for (let i = 0; i < steps; i++) {
+      ctx.rider.update(0.04, { lean, crouch, air, steer, grab, speed, land: false });
+    }
     renderFrame();
-    return { lean: ctx.rider.leanSmooth, crouch: ctx.rider.crouchSmooth };
+    return { lean: ctx.rider.leanSmooth, crouch: ctx.rider.crouchSmooth, tuck: ctx.rider.tuckAmt };
   },
 };
 

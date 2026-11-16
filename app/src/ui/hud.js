@@ -2,6 +2,12 @@ import { formatTime } from '../core/noise.js';
 
 const $ = (id) => document.getElementById(id);
 
+/** Splits a race time into "40.400" style course-setter targets. */
+function target(t) {
+  if (t == null) return '--';
+  return t.toFixed(3);
+}
+
 export class HUD {
   constructor() {
     this.el = {
@@ -19,6 +25,7 @@ export class HUD {
       timeMs: $('timeMs'),
       gateNow: $('gateNow'),
       gateTotal: $('gateTotal'),
+      gateChip: $('gateChip'),
       splitVal: $('splitVal'),
       splitWrap: $('splitWrap'),
       speedVal: $('speedVal'),
@@ -29,14 +36,19 @@ export class HUD {
       judgeSub: $('judgeSub'),
       countdown: $('countdown'),
       goFlash: $('goFlash'),
-      progFill: $('progFill'),
-      progTxt: $('progTxt'),
       bestTime: $('bestTime'),
       equippedText: $('equippedText'),
       metaMap: $('metaMap'),
       metaMode: $('metaMode'),
       hudMode: $('hudMode'),
       hudCourse: $('hudCourse'),
+      setterPanel: $('setterPanel'),
+      tGold: $('tGold'),
+      tSilver: $('tSilver'),
+      tBronze: $('tBronze'),
+      tBest: $('tBest'),
+      hudHint: $('hudHint'),
+      speedlines: $('speedlines'),
       resMedal: $('resMedal'),
       resTitle: $('resTitle'),
       resMode: $('resMode'),
@@ -46,20 +58,18 @@ export class HUD {
       resClean: $('resClean'),
       resTop: $('resTop'),
       btnMute: $('btnMute'),
-      btnShopHud: $('btnShopHud'),
     };
-    this.judgeTimer = null;
-    this.lastJudge = 0;
+    this.hintTimer = null;
   }
 
   setLoading(p, note) {
-    this.el.loadFill.style.width = `${Math.round(p * 100)}%`;
-    if (note) this.el.loadNote.textContent = note;
+    if (this.el.loadFill) this.el.loadFill.style.width = `${Math.round(p * 100)}%`;
+    if (note && this.el.loadNote) this.el.loadNote.textContent = note;
   }
 
   showLoader() {
     this.el.loader.classList.remove('hidden', 'done');
-    this.el.loadFill.style.width = '6%';
+    if (this.el.loadFill) this.el.loadFill.style.width = '6%';
   }
 
   hideLoader() {
@@ -67,46 +77,52 @@ export class HUD {
     setTimeout(() => this.el.loader.classList.add('hidden'), 700);
   }
 
-  showTitle(v = true) {
-    this.el.title.classList.toggle('hidden', !v);
-  }
-
-  showHUD(v = true) {
-    this.el.hud.classList.toggle('hidden', !v);
-  }
-
-  showResult(v = true) {
-    this.el.result.classList.toggle('hidden', !v);
-  }
-
-  showPause(v = true) {
-    this.el.pause.classList.toggle('hidden', !v);
-  }
-
-  showShop(v = true) {
-    this.el.shop.classList.toggle('hidden', !v);
-  }
-
-  showTouch(v = true) {
-    this.el.touch.classList.toggle('hidden', !v);
-  }
+  showTitle(v = true) { this.el.title.classList.toggle('hidden', !v); }
+  showHUD(v = true) { this.el.hud.classList.toggle('hidden', !v); }
+  showResult(v = true) { this.el.result.classList.toggle('hidden', !v); }
+  showPause(v = true) { this.el.pause.classList.toggle('hidden', !v); }
+  showShop(v = true) { this.el.shop.classList.toggle('hidden', !v); }
+  showTouch(v = true) { this.el.touch.classList.toggle('hidden', !v); }
 
   setTitleInfo({ best, mapName, skinName, mode }) {
     this.el.bestTime.textContent = best ? formatTime(best) : '--:--.--';
     this.el.equippedText.innerHTML = `${skinName} · <em>${mapName}</em>`;
-    this.el.metaMap.textContent = mapName;
+    this.el.metaMap.textContent = mapName.toUpperCase();
     this.el.metaMode.textContent = mode;
   }
 
   setRunInfo(mode, course) {
-    this.el.hudMode.textContent = mode.toUpperCase();
+    this.el.hudMode.textContent = mode === 'race' ? 'RACE' : 'PARK';
     this.el.hudCourse.textContent = course.toUpperCase();
     this.el.splitWrap.style.display = mode === 'race' ? '' : 'none';
+    this.el.setterPanel.style.display = mode === 'race' ? '' : 'none';
+    document.body.classList.toggle('race', mode === 'race');
+    document.body.classList.toggle('park', mode !== 'race');
+    this.setHint(
+      mode === 'race'
+        ? 'HOLD <kbd>↑</kbd> TO TUCK · <kbd>←</kbd><kbd>→</kbd> TO STEER'
+        : 'HOLD <kbd>↑</kbd> TO TUCK · <kbd>SPACE</kbd> TO JUMP'
+    );
+  }
+
+  /** The "Course Setter" panel: the times the course asks you to beat. */
+  setCourseTargets({ gold, silver, bronze, best }) {
+    if (this.el.tGold) this.el.tGold.textContent = target(gold);
+    if (this.el.tSilver) this.el.tSilver.textContent = target(silver);
+    if (this.el.tBronze) this.el.tBronze.textContent = target(bronze);
+    if (this.el.tBest) this.el.tBest.textContent = best ? target(best) : '—';
+  }
+
+  setHint(html) {
+    if (!this.el.hudHint) return;
+    this.el.hudHint.innerHTML = html;
+    this.el.hudHint.classList.remove('fade');
+    clearTimeout(this.hintTimer);
+    this.hintTimer = setTimeout(() => this.el.hudHint.classList.add('fade'), 6000);
   }
 
   showGateCounter(v) {
-    const el = this.el.gateNow?.parentElement;
-    if (el) el.style.display = v ? '' : 'none';
+    if (this.el.gateChip) this.el.gateChip.style.display = v ? '' : 'none';
   }
 
   setGate(i, total) {
@@ -114,24 +130,24 @@ export class HUD {
     this.el.gateTotal.textContent = String(total).padStart(2, '0');
   }
 
+  /** Big race clock; `bestSplit` shows live +/- against your own best. */
   setTime(t, bestSplit = null) {
     const m = Math.floor(t / 60);
     const s = Math.floor(t % 60);
     const cs = Math.floor((t * 100) % 100);
-    this.el.timeMain.textContent = `${m}:${String(s).padStart(2, '0')}`;
-    this.el.timeMs.textContent = `.${String(cs).padStart(2, '0')}`;
+    this.el.timeMain.textContent = m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}.${String(cs).padStart(2, '0')}`;
+    this.el.timeMs.textContent = m > 0 ? `${String(cs).padStart(2, '0')}` : '';
     if (bestSplit != null) {
       const d = t - bestSplit;
       this.el.splitVal.textContent = `${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(2)}`;
-      this.el.splitVal.className = d <= 0 ? 'ok' : '';
+      this.el.splitVal.style.color = d <= 0 ? '#63e6a0' : '#ff9d9d';
     }
   }
 
   setSpeed(kmh) {
     const v = Math.round(kmh);
     this.el.speedVal.textContent = String(v);
-    const p = Math.min(1, v / 130);
-    this.el.speedRing.style.strokeDashoffset = String(201 - 201 * p);
+    if (this.el.speedRing) this.el.speedRing.style.width = `${Math.min(100, (v / 140) * 100)}%`;
   }
 
   setAirtime(t) {
@@ -143,11 +159,14 @@ export class HUD {
     }
   }
 
-  setProgress(p) {
-    const v = Math.max(0, Math.min(1, p));
-    this.el.progFill.style.width = `${v * 100}%`;
-    this.el.progTxt.textContent = `${Math.round(v * 100)}%`;
+  /** Tuck strength drives the speed-line overlay. */
+  setTuck(amount, speed = 0) {
+    const a = Math.max(0, Math.min(1, amount)) * Math.min(1, Math.max(0, (speed - 12) / 26));
+    if (this.el.speedlines) this.el.speedlines.style.opacity = (a * 0.17).toFixed(3);
   }
+
+  /** Kept for the progress read-out in the old layout (no longer drawn). */
+  setProgress() {}
 
   countdown(text, tone = 'normal') {
     const el = this.el.countdown;
@@ -186,7 +205,7 @@ export class HUD {
   }
 
   showResultData({ medal, title, mode, time, best, diff, clean, total, topSpeed, cleanLabel, extra }) {
-    const labelEl = document.getElementById('resCleanK');
+    const labelEl = $('resCleanK');
     if (labelEl) labelEl.textContent = cleanLabel ?? 'CLEAN LINES';
     this.el.resMedal.textContent = medal ?? '🏔️';
     this.el.resTitle.textContent = title;

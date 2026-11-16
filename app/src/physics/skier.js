@@ -3,7 +3,10 @@ import { clamp, damp, lerp } from '../core/noise.js';
 import { PISTE_HALF, START_Z } from '../scene/terrain.js';
 
 const G = 9.81;
-const MAX_EDGE = 1.02;          // ~58° of edge angle
+const MAX_EDGE = 1.12;          // ~64° of edge angle
+const STEER_DAMP = 9.6;         // how fast the steering input reaches full lock
+const EDGE_DAMP = 9.0;          // how fast the ski rolls onto its edge
+const TUCK_DAMP = 5.0;          // body drop into the aero tuck
 const _n = new THREE.Vector3();
 
 /**
@@ -44,6 +47,7 @@ export class SkierPhysics {
     this.bestAir = 0;
     this.spinTotal = 0;
     this.tuck = false;
+    this.tuckAmt = 0;
     this.brake = false;
     this.maxSpeed = 0;
     this.distance = 0;
@@ -61,7 +65,11 @@ export class SkierPhysics {
     return this.airborne || this.airTime > 0;
   }
 
-  /** input: { left, right, tuck, brake, jump } (booleans) */
+  /**
+   * input: { left, right, axis, tuck, brake, jump, allowJump }
+   * `axis` (-1..1) is the analog steering from a touch drag; when it is
+   * present it replaces the digital left/right flags.
+   */
   update(dt, input) {
     const t = this.terrain;
     // safety net: never let a bad frame poison the simulation
@@ -76,21 +84,27 @@ export class SkierPhysics {
       this.airborne = false;
     }
     this.landedThisFrame = false;
-    const steerInput = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    this.steer = damp(this.steer, steerInput, 7, dt);
+    const digital = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const analog = Number.isFinite(input.axis) ? clamp(input.axis, -1, 1) : null;
+    const steerInput = analog !== null && Math.abs(analog) > 0.001 ? analog : digital;
+    // a stick that is already displaced bites its edge sooner, a released one
+    // unwinds a touch slower so the arc keeps its shape
+    const releasing = Math.abs(steerInput) < Math.abs(this.steer);
+    this.steer = damp(this.steer, steerInput, releasing ? STEER_DAMP * 0.62 : STEER_DAMP, dt);
     this.tuck = !!input.tuck;
+    this.tuckAmt = damp(this.tuckAmt ?? 0, this.tuck ? 1 : 0, TUCK_DAMP, dt);
     this.brake = !!input.brake && !this.airborne;
 
-    // ── edge angle builds progressively ──
+    // ── edge angle builds progressively, but answers the stick at once ──
     let edgeTarget = this.steer * MAX_EDGE;
     if (this.airborne) edgeTarget *= 0.35;
     if (this.brake) edgeTarget = 0;
-    this.edge = damp(this.edge, edgeTarget, this.airborne ? 3 : 4.2, dt);
+    this.edge = damp(this.edge, edgeTarget, this.airborne ? 3.4 : EDGE_DAMP, dt);
     if (!Number.isFinite(this.edge)) this.edge = 0;
 
     // ── carve: heading changes at g·tan(edge)/v ──
-    let omega = (G * Math.tan(this.edge)) / Math.max(this.speed, 3.2);
-    omega = clamp(omega, -1.45, 1.45);
+    let omega = (G * Math.tan(this.edge)) / Math.max(this.speed, 3.4);
+    omega = clamp(omega, -1.7, 1.7);
     if (!this.airborne) {
       this.heading += omega * dt;
     } else {
@@ -105,13 +119,16 @@ export class SkierPhysics {
     // ── gravity down the fall line, drag, edge scrub ──
     const slope = t.slopeAlong(this.x, this.z, fx, fz);
     if (!this.airborne) {
-      const grav = G * slope;
-      const dragK = this.tuck ? 0.0016 : 0.0028;
-      const drag = dragK * this.speed * this.speed + 0.28 + (this.brake ? 6.2 : 0);
-      const scrub = Math.abs(this.edge) * this.speed * 0.021;
+      // in the tuck the chest is flat, the poles are under the arms and the
+      // rider keeps gravity: a clear, felt acceleration bonus
+      const tuckK = this.tuckAmt ?? 0;
+      const grav = G * slope * (1 + 0.12 * tuckK);
+      const dragK = 0.003 - 0.0008 * tuckK;
+      const drag = dragK * this.speed * this.speed + 0.28 - 0.1 * tuckK + (this.brake ? 6.2 : 0);
+      const scrub = Math.abs(this.edge) * this.speed * 0.021 * (1 - 0.45 * tuckK);
       const railDrag = this.rail ? 0.9 : 0;
-      this.speed += (grav - drag - scrub - railDrag) * dt;
-      this.speed = clamp(this.speed, 0, 62);
+      this.speed += (grav + 0.35 * tuckK - drag - scrub - railDrag) * dt;
+      this.speed = clamp(this.speed, 0, 34);
       if (!Number.isFinite(this.speed)) this.speed = 0;
     } else {
       this.speed -= this.speed * 0.045 * dt; // a little air drag
@@ -161,8 +178,8 @@ export class SkierPhysics {
       }
     }
 
-    // ── jump ──
-    if (input.jump && !this.airborne && !this.rail && this.speed > 2) {
+    // ── jump: park only, race runs have no jump at all ──
+    if (input.jump && input.allowJump !== false && !this.airborne && !this.rail && this.speed > 2) {
       this.airborne = true;
       this.vy = 6.4 + this.speed * 0.055;
       this.airTime = 0;

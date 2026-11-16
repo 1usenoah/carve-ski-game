@@ -62,14 +62,21 @@ export class ChaseCamera {
     if (!isFinite(this.yaw)) this.yaw = skier.heading || 0;
 
     const speed = skier.speed;
-    const dist = 4.7 + speed * 0.04;
-    const height = 2.55 + speed * 0.012;
+    // a low, close chase camera: the rider stays big in frame and the
+    // horizon sits high, the way a downhill run reads on screen
+    const tuck = clamp(skier.tuckAmt ?? 0, 0, 1);
+    // portrait phones see a very narrow horizontal slice: open the lens and
+    // calm the sideways offset so the rider stays in frame
+    const narrow = clamp(0.95 / Math.max(0.35, cam.aspect), 1, 1.62);
+    const side = skier.edge * 1.1 / narrow;
+    const dist = (4.15 + speed * 0.026 + tuck * 0.25) * Math.min(1.18, narrow * 0.92);
+    const height = 1.82 + speed * 0.008 - tuck * 0.18;
     const fx = Math.sin(this.yaw);
     const fz = -Math.cos(this.yaw);
     _pos.set(
-      skier.x - fx * dist - Math.cos(this.yaw) * skier.edge * 1.1,
+      skier.x - fx * dist - Math.cos(this.yaw) * side,
       skier.y + height,
-      skier.z - fz * dist + Math.sin(this.yaw) * skier.edge * 1.1
+      skier.z - fz * dist + Math.sin(this.yaw) * side
     );
 
     // landing shake
@@ -81,13 +88,13 @@ export class ChaseCamera {
     this.pos.lerp(_pos, 1 - Math.exp(-17 * dt));
     // never let the camera sink under the snow surface
     if (this.terrain) {
-      const gh = this.terrain.heightAt(this.pos.x, this.pos.z) + 1.15;
+      const gh = this.terrain.heightAt(this.pos.x, this.pos.z) + 0.95;
       if (this.pos.y < gh) this.pos.y = gh;
     }
     _look.set(
-      skier.x + fx * (6 + speed * 0.12),
-      skier.y + 1.25 - speed * 0.004,
-      skier.z + fz * (7.5 + speed * 0.11)
+      skier.x + fx * (7 + speed * 0.1) / narrow,
+      skier.y + 1.05 - speed * 0.004,
+      skier.z + fz * (8.5 + speed * 0.09) / narrow
     );
     this.look.lerp(_look, 1 - Math.exp(-19 * dt));
     if (this.terrain) {
@@ -99,11 +106,11 @@ export class ChaseCamera {
     cam.up.set(0, 1, 0);
     cam.lookAt(this.look);
 
-    // carve roll and speed fov
-    const rollTarget = -skier.edge * 0.15;
+    // carve roll and speed fov; the tuck opens the lens for real speed feel
+    const rollTarget = -skier.edge * 0.085;
     this.roll = damp(this.roll, rollTarget, 6, dt);
     cam.rotateZ(this.roll);
-    const fovTarget = 58 + clamp(speed, 0, 40) * 0.6 + skier.edge * 2.5;
+    const fovTarget = Math.min(92, (54 + clamp(speed, 0, 40) * 0.16 + skier.edge * 2 + tuck * 5.5) * narrow);
     this.fov = damp(this.fov, fovTarget, 3.2, dt);
     cam.fov = this.fov;
     cam.updateProjectionMatrix();

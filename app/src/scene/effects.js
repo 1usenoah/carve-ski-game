@@ -281,6 +281,45 @@ export class Effects {
     }
   }
 
+  /** Snow and a plastic crack when a gate pole is clipped. */
+  poleHit(pos, force = 1) {
+    const n = Math.round(10 + force * 12);
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = (1.2 + Math.random() * 2.6) * (0.6 + force * 0.4);
+      this.spray.emit(
+        pos.x + (Math.random() - 0.5) * 0.3,
+        pos.y + 0.5 + Math.random() * 1.3,
+        pos.z + (Math.random() - 0.5) * 0.3,
+        Math.cos(a) * sp,
+        1.4 + Math.random() * 2.6,
+        Math.sin(a) * sp,
+        0.05 + Math.random() * 0.09,
+        0.35 + Math.random() * 0.45
+      );
+    }
+    for (let i = 0; i < 4; i++) {
+      this.mist.emit(
+        pos.x + (Math.random() - 0.5) * 0.8,
+        pos.y + 0.4 + Math.random() * 0.7,
+        pos.z + (Math.random() - 0.5) * 0.8,
+        (Math.random() - 0.5) * 2.4,
+        0.5 + Math.random(),
+        (Math.random() - 0.5) * 2.4,
+        0.35 + Math.random() * 0.4,
+        0.4 + Math.random() * 0.4
+      );
+    }
+    this.sparks.points.material.uniforms.uColor.value.setRGB(1, 1, 1);
+    for (let i = 0; i < 6; i++) {
+      this.sparks.emit(
+        pos.x, pos.y + 1.1, pos.z,
+        (Math.random() - 0.5) * 3, 1.5 + Math.random() * 2, (Math.random() - 0.5) * 3,
+        0.05, 0.25
+      );
+    }
+  }
+
   /** Bright sparks and a puff of snow when a gate is passed cleanly. */
   gateBurst(pos, color, count = 26) {
     const c = new THREE.Color(color);
