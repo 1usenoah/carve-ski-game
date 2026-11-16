@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-<title>CARVE RUSH · 3D 스키 프로토타입</title>
+<title>CARVE RUSH 2 · 3D 스키</title>
+<meta name="theme-color" content="#050b14" />
+<meta name="description" content="CARVE RUSH 2 — WebGL 3D 알파인 스키 레이싱. 카빙 물리, 게이트 라인, 파크 모드." />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -11,2650 +13,454 @@
   :root{
     --accent:#5ef0d8;
     --accent-2:#ff5fa2;
+    --accent-3:#7fb6ff;
     --ink:#eaf4ff;
-    --ink-dim:#9fb4c9;
-    --panel:rgba(8,16,28,.58);
-    --panel-2:rgba(10,20,34,.82);
+    --ink-dim:#9db4cc;
+    --panel:rgba(8,16,28,.52);
+    --panel-solid:rgba(7,13,23,.9);
     --stroke:rgba(255,255,255,.14);
-    --gold:#ffcf5c;
-    --silver:#cdd9e6;
-    --bronze:#d59466;
+    --gold:#ffcf5c; --silver:#dfe8f2; --bronze:#e0935c;
     --font:'Noto Sans KR', system-ui, -apple-system, 'Segoe UI', 'Apple SD Gothic Neo', sans-serif;
     --num:'Rajdhani','Noto Sans KR', ui-monospace, monospace;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%;}
   body{
-    margin:0; overflow:hidden; background:#050b14; color:var(--ink);
+    margin:0; overflow:hidden; background:#04080f; color:var(--ink);
     font-family:var(--font); user-select:none; -webkit-user-select:none;
-    touch-action:none;
+    touch-action:none; letter-spacing:-.01em;
   }
-  canvas#app{position:fixed; inset:0; width:100%; height:100%; display:block;}
+  canvas#app{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0;}
   .hidden{display:none !important;}
+  button{font-family:inherit;}
 
-  /* ---------- 공통 패널 ---------- */
-  .panel{
-    background:var(--panel); border:1px solid var(--stroke); border-radius:16px;
-    backdrop-filter:blur(14px) saturate(120%); -webkit-backdrop-filter:blur(14px) saturate(120%);
-    box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.08);
-  }
-  .btn{
-    appearance:none; border:1px solid var(--stroke); border-radius:12px; cursor:pointer;
-    background:linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.04));
-    color:var(--ink); font-family:var(--font); font-weight:700; font-size:14px;
-    padding:11px 18px; letter-spacing:.02em; transition:transform .12s ease, background .2s, border-color .2s, box-shadow .2s;
-  }
-  .btn:hover{background:linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.08)); border-color:rgba(255,255,255,.28);}
-  .btn:active{transform:translateY(1px) scale(.99);}
-  .btn.primary{
-    background:linear-gradient(135deg, var(--accent), #3ec6ff);
-    color:#04131a; border-color:transparent; box-shadow:0 10px 28px rgba(94,240,216,.28);
-  }
-  .btn.primary:hover{box-shadow:0 14px 34px rgba(94,240,216,.42);}
-  .btn.ghost{background:rgba(255,255,255,.04);}
-  .btn:disabled{opacity:.45; cursor:default;}
+/* ───────────── 공통 글래스 패널 ───────────── */
+.panel{
+  background:linear-gradient(180deg, rgba(18,30,46,.66), rgba(6,12,21,.72));
+  border:1px solid var(--stroke); border-radius:16px;
+  backdrop-filter:blur(16px) saturate(135%); -webkit-backdrop-filter:blur(16px) saturate(135%);
+  box-shadow:0 20px 46px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.09);
+}
+.btn{
+  appearance:none; border:1px solid var(--stroke); border-radius:12px; cursor:pointer;
+  background:linear-gradient(180deg, rgba(255,255,255,.13), rgba(255,255,255,.03));
+  color:var(--ink); font-weight:700; font-size:14px; padding:11px 18px;
+  transition:transform .12s ease, background .2s, border-color .2s, box-shadow .2s, opacity .2s;
+}
+.btn:hover{background:linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.07)); border-color:rgba(255,255,255,.3);}
+.btn:active{transform:translateY(1px) scale(.99);}
+.btn.primary{
+  background:linear-gradient(135deg, #5ef0d8, #41b7ff);
+  color:#04131a; border-color:transparent; box-shadow:0 12px 30px rgba(94,240,216,.3);
+}
+.btn.primary:hover{box-shadow:0 16px 40px rgba(94,240,216,.46);}
+.btn.ghost{background:rgba(255,255,255,.035);}
+.btn.small{padding:8px 12px; font-size:12px; border-radius:10px;}
+.btn:disabled{opacity:.4; cursor:default;}
 
-  /* ---------- HUD ---------- */
-  #hud{position:fixed; inset:0; pointer-events:none; z-index:10;}
-  .hud-top{position:absolute; top:18px; left:18px; right:18px; display:flex; justify-content:space-between; align-items:flex-start; gap:16px;}
-  .race-panel{padding:14px 18px 12px; min-width:290px; pointer-events:none;}
-  .race-panel .maprow{display:flex; align-items:center; gap:8px; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-dim); font-weight:700;}
-  .race-panel .dot{color:var(--accent); text-shadow:0 0 12px var(--accent);}
-  .timer{font-family:var(--num); font-size:52px; line-height:1; font-weight:700; letter-spacing:.01em; font-variant-numeric:tabular-nums; margin:6px 0 4px; text-shadow:0 6px 26px rgba(0,0,0,.55);}
-  .timer small{font-size:18px; color:var(--ink-dim); margin-left:6px; letter-spacing:.16em;}
-  .subrow{display:flex; justify-content:space-between; gap:18px; font-size:12.5px; color:var(--ink-dim); font-weight:700; letter-spacing:.06em;}
-  .subrow b{color:var(--ink); font-weight:700;}
-  .gatebar{height:4px; border-radius:4px; background:rgba(255,255,255,.12); margin-top:9px; overflow:hidden;}
-  .gatebar > i{display:block; height:100%; width:0%; background:linear-gradient(90deg, var(--accent), #64b6ff); transition:width .25s ease;}
+/* ───────────── 로딩 ───────────── */
+#loader{position:fixed; inset:0; z-index:80; display:grid; place-items:center;
+  background:radial-gradient(120% 90% at 50% 0%, #123049 0%, #060d17 55%, #03060b 100%);
+  transition:opacity .6s ease;}
+#loader.done{opacity:0; pointer-events:none;}
+.load-box{text-align:center; width:min(420px, 82vw);}
+.load-logo{font-family:var(--num); font-size:13px; letter-spacing:.52em; color:var(--accent); margin-bottom:14px;}
+.load-title{font-size:34px; font-weight:900; letter-spacing:-.03em; margin:0 0 8px;
+  background:linear-gradient(100deg,#fff,#9be9ff 45%,#5ef0d8); -webkit-background-clip:text; background-clip:text; color:transparent;}
+.load-sub{color:var(--ink-dim); font-size:12.5px; letter-spacing:.02em; margin-bottom:26px;}
+.load-bar{height:4px; border-radius:99px; background:rgba(255,255,255,.1); overflow:hidden;}
+.load-bar i{display:block; height:100%; width:8%; border-radius:99px;
+  background:linear-gradient(90deg,#5ef0d8,#41b7ff); transition:width .25s ease;}
+.load-note{margin-top:12px; font-family:var(--num); font-size:11px; letter-spacing:.18em; color:#6f8aa3;}
 
-  .speed-panel{padding:14px 18px; min-width:196px; text-align:right;}
-  .speedval{font-family:var(--num); font-size:46px; font-weight:700; line-height:1; letter-spacing:.02em;}
-  .speedval .unit{font-family:var(--font); font-size:13px; color:var(--ink-dim); letter-spacing:.18em; margin-left:6px;}
-  .speedbar{height:4px; border-radius:4px; background:rgba(255,255,255,.12); margin:8px 0 10px; overflow:hidden;}
-  .speedbar > i{display:block; height:100%; width:0%; background:linear-gradient(90deg,#64b6ff, var(--accent-2)); transition:width .12s linear;}
-  .speed-panel .line{display:flex; justify-content:space-between; gap:12px; font-size:11.5px; color:var(--ink-dim); font-weight:700; letter-spacing:.1em;}
-  .speed-panel .line b{color:var(--ink); font-family:var(--num); font-size:14px; letter-spacing:.04em;}
+/* ───────────── 타이틀 ───────────── */
+#title{position:fixed; inset:0; z-index:40; display:flex; flex-direction:column;
+  justify-content:space-between; padding:clamp(18px,3.4vw,44px); pointer-events:none;}
+#title::before{content:''; position:absolute; inset:0; pointer-events:none;
+  background:
+    linear-gradient(180deg, rgba(4,10,18,.62) 0%, rgba(4,10,18,.18) 26%, rgba(4,10,18,0) 44%, rgba(4,10,18,.12) 68%, rgba(4,10,18,.66) 100%),
+    linear-gradient(90deg, rgba(4,10,18,.5) 0%, rgba(4,10,18,.1) 34%, rgba(4,10,18,0) 60%);}
+#title > *{position:relative; z-index:1;}
+#title .t-top{display:flex; justify-content:space-between; align-items:flex-start; gap:20px;}
+.brand{pointer-events:auto;}
+.brand-kicker{font-family:var(--num); font-size:11px; letter-spacing:.5em; color:var(--accent); margin-bottom:6px;}
+.brand-title{font-size:clamp(44px,7.4vw,96px); font-weight:900; line-height:.9; margin:0; letter-spacing:-.045em;
+  background:linear-gradient(96deg,#ffffff 10%,#b9ecff 46%,#5ef0d8 78%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 12px 34px rgba(0,0,0,.55));}
+.brand-title span{display:block; font-size:.36em; letter-spacing:.34em; font-weight:700; color:#8fd8ff;
+  -webkit-text-fill-color:#8fd8ff; margin-top:12px; filter:none;}
+.brand-meta{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap;}
+.chip{font-family:var(--num); font-size:11px; letter-spacing:.12em; padding:6px 11px; border-radius:99px;
+  border:1px solid rgba(255,255,255,.16); background:rgba(8,18,30,.5); color:#b9cee0;}
+.chip b{color:var(--accent); font-weight:700;}
+.t-side{pointer-events:auto; display:flex; flex-direction:column; gap:10px; align-items:flex-end;}
+.ghost-box{padding:13px 16px; min-width:188px; text-align:right;}
+.ghost-box .lbl{font-family:var(--num); font-size:10px; letter-spacing:.24em; color:#7f9ab3;}
+.ghost-box .val{font-family:var(--num); font-size:28px; font-weight:700; line-height:1.05; color:#fff;}
+.ghost-box .val small{font-size:12px; color:#8aa4bb; letter-spacing:.1em; margin-left:4px;}
+#title .t-bottom{display:flex; align-items:flex-end; justify-content:space-between; gap:24px; flex-wrap:wrap;}
+.menu{pointer-events:auto; display:flex; flex-direction:column; gap:11px; width:min(360px,86vw);}
+.menu .row{display:flex; gap:10px;}
+.mode-btn{flex:1; display:flex; flex-direction:column; gap:3px; align-items:flex-start;
+  padding:14px 16px; border-radius:14px; text-align:left; cursor:pointer;
+  border:1px solid rgba(255,255,255,.2); background:linear-gradient(180deg, rgba(10,20,32,.82), rgba(5,10,18,.92));
+  color:var(--ink); transition:.2s; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  box-shadow:0 14px 34px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.08);}
+.mode-btn:hover{border-color:rgba(94,240,216,.55); transform:translateY(-1px);
+  box-shadow:0 16px 36px rgba(0,0,0,.4), 0 0 0 1px rgba(94,240,216,.2) inset;}
+.mode-btn b{font-size:15.5px; font-weight:800; letter-spacing:.01em;}
+.mode-btn i{font-style:normal; font-size:11.5px; color:#93aec4; letter-spacing:.02em;}
+.mode-btn.race b::before{content:'🏁 '; font-size:13px;}
+.mode-btn.park b::before{content:'🎿 '; font-size:13px;}
+.menu-foot{display:flex; gap:8px; align-items:center;}
+.menu-foot .btn{flex:1; background:linear-gradient(180deg, rgba(10,20,32,.82), rgba(5,10,18,.92));}
+.key-hint{pointer-events:none; font-family:var(--num); font-size:11px; letter-spacing:.1em; color:#c3d6e6;
+  text-align:right; line-height:1.9;}
+.key-hint kbd{font-family:var(--num); background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.16);
+  border-radius:5px; padding:1px 6px; color:#cfe2f2; font-size:10.5px;}
+#title .equipped{padding:12px 15px; min-width:188px; text-align:right;}
+#title .equipped .lbl{font-family:var(--num); font-size:10px; letter-spacing:.24em; color:#7f9ab3; margin-bottom:2px;}
+#title .equipped .val{font-weight:700; font-size:14px; color:#e7f3ff;}
+#title .equipped .val em{font-style:normal; color:var(--accent);}
 
-  .hud-bot{position:absolute; left:18px; right:18px; bottom:18px; display:flex; align-items:flex-end; justify-content:space-between; gap:18px;}
-  .hud-btns{display:flex; gap:8px; pointer-events:auto;}
-  .hud-btns .btn{padding:9px 14px; font-size:13px; border-radius:11px;}
+/* ───────────── 인게임 HUD ───────────── */
+#hud{position:fixed; inset:0; z-index:30; pointer-events:none;}
+.hud-top{position:absolute; top:clamp(12px,2vw,22px); left:clamp(12px,2vw,22px); right:clamp(12px,2vw,22px);
+  display:flex; justify-content:space-between; align-items:flex-start; gap:12px;}
+.race-panel{padding:12px 18px 11px; min-width:236px;}
+.race-panel .lbl{font-family:var(--num); font-size:10px; letter-spacing:.24em; color:#7f9ab3; display:flex; gap:8px; align-items:center;}
+.race-panel .lbl .mode{color:var(--accent);}
+.timer{font-family:var(--num); font-size:44px; font-weight:700; line-height:1; letter-spacing:.01em;
+  font-variant-numeric:tabular-nums; margin-top:2px; text-shadow:0 4px 22px rgba(0,0,0,.5);}
+.timer small{font-size:20px; color:#8fa9c1; letter-spacing:.02em;}
+.race-sub{display:flex; gap:16px; margin-top:5px; font-family:var(--num); font-size:12px; color:#9ab2c8; letter-spacing:.06em;}
+.race-sub b{color:#e9f5ff; font-weight:700;}
+.race-sub .ok{color:var(--accent);}
+.hud-right{display:flex; flex-direction:column; align-items:flex-end; gap:10px;}
+.speedo{padding:10px 16px 8px; display:flex; align-items:center; gap:12px;}
+.speedo svg{width:76px; height:76px; transform:rotate(-90deg);}
+.speedo .ring-bg{fill:none; stroke:rgba(255,255,255,.11); stroke-width:6;}
+.speedo .ring-fg{fill:none; stroke:url(#spd); stroke-width:6; stroke-linecap:round;
+  stroke-dasharray:201; stroke-dashoffset:201; transition:stroke-dashoffset .08s linear;}
+.speed-txt{text-align:right;}
+.speed-txt .v{font-family:var(--num); font-size:39px; font-weight:700; line-height:.92; font-variant-numeric:tabular-nums;}
+.speed-txt .u{font-family:var(--num); font-size:10px; letter-spacing:.26em; color:#7f9ab3;}
+.air-badge{padding:7px 14px; font-family:var(--num); font-size:12px; letter-spacing:.18em; color:#04131a;
+  background:linear-gradient(135deg,#ffd15c,#ff8a3d); border-radius:99px; font-weight:700;
+  box-shadow:0 8px 22px rgba(255,160,60,.35);}
+.hud-br{position:absolute; right:clamp(12px,2vw,22px); bottom:clamp(12px,2vw,22px);
+  display:flex; gap:8px; pointer-events:auto;}
+.icon-btn{width:42px; height:42px; display:grid; place-items:center; border-radius:12px; cursor:pointer;
+  border:1px solid var(--stroke); background:var(--panel); color:#cfe3f4; font-size:16px;
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); transition:.18s;}
+.icon-btn:hover{background:rgba(30,48,68,.7); border-color:rgba(255,255,255,.28);}
+.icon-btn.off{color:#6d849a;}
+.hud-bl{position:absolute; left:clamp(12px,2vw,22px); bottom:clamp(12px,2vw,22px); display:flex; flex-direction:column; gap:6px;}
+#progressWrap{width:190px; padding:9px 12px 10px;}
+#progressWrap .lbl{font-family:var(--num); font-size:9.5px; letter-spacing:.22em; color:#7f9ab3; display:flex; justify-content:space-between;}
+#progressBar{height:4px; border-radius:99px; background:rgba(255,255,255,.12); overflow:hidden; margin-top:7px;}
+#progressBar i{display:block; height:100%; width:0%; border-radius:99px;
+  background:linear-gradient(90deg,#5ef0d8,#8fd8ff); transition:width .25s ease;}
 
-  #trickFeed{display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex:1; max-width:420px; margin-left:auto; pointer-events:none;}
-  .trick-row{
-    font-family:var(--num); font-weight:700; font-size:15px; letter-spacing:.06em;
-    background:rgba(6,14,24,.62); border:1px solid rgba(94,240,216,.35); color:var(--ink);
-    padding:6px 12px; border-radius:10px; animation:popIn .28s ease both;
-    box-shadow:0 8px 22px rgba(0,0,0,.35);
-  }
-  .trick-row .pts{color:var(--accent); margin-left:8px;}
-  @keyframes popIn{from{opacity:0; transform:translateY(8px) scale(.94);} to{opacity:1; transform:none;}}
+/* 판정 토스트 */
+#judge{position:absolute; left:50%; top:23%; transform:translate(-50%,0); text-align:center; opacity:0;}
+#judge.show{animation:judgeIn 1.5s ease forwards;}
+#judge .j-main{font-family:var(--num); font-weight:700; font-size:34px; letter-spacing:.1em; line-height:1;
+  text-shadow:0 6px 30px rgba(0,0,0,.6);}
+#judge .j-sub{font-family:var(--num); font-size:12px; letter-spacing:.26em; color:#bfe6f5; margin-top:7px;}
+#judge.perfect .j-main{color:#fff; text-shadow:0 0 28px rgba(94,240,216,.9), 0 6px 26px rgba(0,0,0,.6);}
+#judge.clean .j-main{color:#9dffe9;}
+#judge.tight .j-main{color:#ffd76b;}
+#judge.wide .j-main{color:#ff9d9d;}
+@keyframes judgeIn{
+  0%{opacity:0; transform:translate(-50%,14px) scale(.94);}
+  14%{opacity:1; transform:translate(-50%,0) scale(1);}
+  78%{opacity:1; transform:translate(-50%,-4px) scale(1);}
+  100%{opacity:0; transform:translate(-50%,-16px) scale(1.01);}
+}
 
-  #trickPop{
-    position:absolute; left:50%; top:34%; transform:translate(-50%,-50%);
-    font-family:var(--num); font-size:44px; font-weight:700; letter-spacing:.06em; text-align:center;
-    color:#fff; text-shadow:0 10px 40px rgba(0,0,0,.6), 0 0 24px rgba(94,240,216,.5);
-    opacity:0; transition:opacity .2s ease; white-space:nowrap;
-  }
-  #trickPop.show{animation:trickPop 1.25s ease both;}
-  @keyframes trickPop{
-    0%{opacity:0; transform:translate(-50%,-50%) scale(.8);}
-    18%{opacity:1; transform:translate(-50%,-50%) scale(1.04);}
-    70%{opacity:1; transform:translate(-50%,-58%) scale(1);}
-    100%{opacity:0; transform:translate(-50%,-72%) scale(.98);}
-  }
-  #trickPop .sub{display:block; font-family:var(--font); font-size:14px; letter-spacing:.3em; color:var(--accent); margin-top:6px;}
-  #airChip{
-    position:absolute; left:50%; bottom:136px; transform:translateX(-50%);
-    display:flex; align-items:center; gap:9px;
-    padding:9px 18px; border-radius:999px; font-family:var(--num); font-weight:700; font-size:19px; letter-spacing:.08em;
-    background:rgba(6,14,24,.74); border:1px solid rgba(94,240,216,.5); color:#eaf4ff;
-    box-shadow:0 0 34px rgba(94,240,216,.22); white-space:nowrap;
-  }
-  #airChip .dot2{width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent);}
-  #airChip b{color:var(--accent);}
+/* 중앙 공지 (카운트다운 / 피니시) */
+#center{position:absolute; inset:0; display:grid; place-items:center; pointer-events:none;}
+#countdown{font-family:var(--num); font-size:clamp(80px,16vw,190px); font-weight:700; line-height:1;
+  letter-spacing:.02em; color:#fff; text-shadow:0 0 60px rgba(94,240,216,.55), 0 18px 50px rgba(0,0,0,.6);
+  opacity:0; transform:scale(.9);}
+#countdown.pulse{animation:cd .92s ease-out;}
+@keyframes cd{0%{opacity:0; transform:scale(1.35);} 22%{opacity:1; transform:scale(1);} 100%{opacity:0; transform:scale(.86);}}
+#goFlash{position:absolute; inset:0; background:radial-gradient(60% 50% at 50% 45%, rgba(94,240,216,.28), transparent 70%);
+  opacity:0; pointer-events:none;}
+#goFlash.on{animation:go .55s ease-out;}
+@keyframes go{0%{opacity:1;}100%{opacity:0;}}
 
-  /* speed vignette */
-  #vignette{
-    position:fixed; inset:0; pointer-events:none; z-index:9; opacity:0;
-    background:radial-gradient(ellipse at 50% 55%, rgba(0,0,0,0) 42%, rgba(2,8,16,.55) 82%, rgba(1,4,10,.85) 100%);
-    transition:opacity .25s linear;
-  }
+/* ───────────── 결과 ───────────── */
+#result{position:fixed; inset:0; z-index:45; display:grid; place-items:center; padding:20px;
+  background:radial-gradient(70% 60% at 50% 40%, rgba(4,10,18,.35), rgba(2,5,10,.82));
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);}
+.res-card{width:min(430px,94vw); padding:26px 26px 22px; text-align:center;}
+.res-kicker{font-family:var(--num); font-size:11px; letter-spacing:.34em; color:#8aa4bb;}
+.res-medal{font-size:60px; line-height:1; margin:12px 0 4px; filter:drop-shadow(0 10px 26px rgba(255,190,80,.35));}
+.res-title{font-size:24px; font-weight:900; margin:0 0 2px; letter-spacing:-.02em;}
+.res-mode{font-family:var(--num); font-size:11px; letter-spacing:.24em; color:#7f9ab3; margin-bottom:18px;}
+.res-rows{display:flex; flex-direction:column; gap:8px; margin-bottom:16px;}
+.res-row{display:flex; justify-content:space-between; align-items:center; padding:9px 13px; border-radius:11px;
+  background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.07);}
+.res-row .k{font-family:var(--num); font-size:10.5px; letter-spacing:.2em; color:#93adc2;}
+.res-row .v{font-family:var(--num); font-size:16px; font-weight:700; color:#fff; font-variant-numeric:tabular-nums;}
+.res-row .v.good{color:var(--accent);}
+.res-row .v.bad{color:#ff9d9d;}
+.res-actions{display:flex; gap:9px;}
+.res-actions .btn{flex:1;}
 
-  /* ---------- 카운트다운 ---------- */
-  #countdown{position:fixed; inset:0; display:grid; place-items:center; z-index:20; pointer-events:none;}
-  #countdown span{
-    font-family:var(--num); font-size:180px; font-weight:700; letter-spacing:.02em; line-height:1;
-    color:#fff; text-shadow:0 20px 70px rgba(0,0,0,.6), 0 0 60px var(--accent);
-  }
-  #countdown span.go{font-size:120px; letter-spacing:.12em;}
-  #countdown span.anim{animation:cdPulse .95s ease-out both;}
-  @keyframes cdPulse{0%{opacity:0; transform:scale(1.7);} 22%{opacity:1; transform:scale(1);} 85%{opacity:.95; transform:scale(.96);} 100%{opacity:.85; transform:scale(.95);}}
+/* ───────────── 상점 ───────────── */
+#shop{position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:18px;
+  background:rgba(3,7,13,.72); backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px); overflow:auto;}
+.shop-card{width:min(880px,96vw); max-height:92vh; overflow:auto; padding:22px 24px 20px;}
+.shop-head{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:6px;}
+.shop-head h2{margin:0; font-size:23px; font-weight:900; letter-spacing:-.02em;}
+.shop-head .sub{font-size:11.5px; color:#8aa4bb; margin-top:5px; line-height:1.6;}
+.shop-close{flex:none;}
+.shop-section{margin-top:18px;}
+.shop-section h3{font-family:var(--num); font-size:11px; letter-spacing:.28em; color:#8fd8ff; margin:0 0 10px;}
+.shop-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:11px;}
+.item{border:1px solid rgba(255,255,255,.1); border-radius:14px; overflow:hidden; background:rgba(255,255,255,.035);
+  display:flex; flex-direction:column; transition:.2s;}
+.item:hover{border-color:rgba(94,240,216,.4); transform:translateY(-2px);}
+.item.owned{border-color:rgba(94,240,216,.3);}
+.item.equipped{border-color:rgba(94,240,216,.75); box-shadow:0 0 0 1px rgba(94,240,216,.3) inset, 0 12px 30px rgba(0,0,0,.4);}
+.item .swatch{height:74px; position:relative; display:grid; place-items:center; overflow:hidden;}
+.item .swatch span{position:relative; z-index:2; font-family:var(--num); font-size:11px; letter-spacing:.18em;
+  color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.6);}
+.item .swatch::after{content:''; position:absolute; inset:0;
+  background:linear-gradient(180deg, rgba(255,255,255,.16), rgba(0,0,0,.25));}
+.item .body{padding:10px 12px 12px; display:flex; flex-direction:column; gap:8px; flex:1;}
+.item .name{font-weight:800; font-size:13.5px;}
+.item .desc{font-size:11px; color:#8aa4bb; line-height:1.5; min-height:32px;}
+.item .foot{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:auto;}
+.item .price{font-family:var(--num); font-size:13px; font-weight:700; color:#dbe9f6;}
+.item .price.free{color:var(--accent);}
+.item .btn{padding:7px 11px; font-size:11.5px;}
+.shop-note{margin-top:16px; font-size:11px; color:#7f97ad; line-height:1.7; border-top:1px solid rgba(255,255,255,.08); padding-top:12px;}
+.shop-note b{color:#b9cee0;}
 
-  /* ---------- 오버레이 공통 ---------- */
-  .overlay{
-    position:fixed; inset:0; z-index:30; display:grid; place-items:center;
-    background:radial-gradient(ellipse at 50% 40%, rgba(4,12,22,.35), rgba(2,6,12,.82));
-    padding:24px;
-  }
-  .modal{
-    width:min(1120px, 96vw); max-height:92vh; overflow:auto; border-radius:22px; padding:22px 24px;
-    background:linear-gradient(180deg, rgba(14,25,40,.94), rgba(7,13,23,.96));
-    border:1px solid rgba(255,255,255,.13);
-    box-shadow:0 40px 90px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.1);
-  }
-  .modal-head{display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:14px;}
-  .modal-head h2{margin:0; font-size:22px; letter-spacing:.02em;}
-  .modal-head .kicker{font-size:11px; letter-spacing:.32em; color:var(--accent); font-weight:700; text-transform:uppercase;}
-  .xbtn{
-    width:38px; height:38px; border-radius:11px; border:1px solid var(--stroke);
-    background:rgba(255,255,255,.05); color:var(--ink); font-size:18px; cursor:pointer; line-height:1;
-  }
-  .xbtn:hover{background:rgba(255,255,255,.12);}
+/* ───────────── 터치 컨트롤 ───────────── */
+#touch{position:fixed; inset:0; z-index:35; pointer-events:none;}
+#touch .t-zone{position:absolute; bottom:0; width:44%; height:52%; pointer-events:auto; display:flex;
+  align-items:flex-end; padding:18px; opacity:.9;}
+#touch .t-zone.l{left:0; justify-content:flex-start; gap:10px;}
+#touch .t-zone.r{right:0; justify-content:flex-end; gap:10px;}
+.tbtn{width:66px; height:66px; border-radius:50%; display:grid; place-items:center; pointer-events:auto;
+  background:rgba(12,24,38,.5); border:1.5px solid rgba(255,255,255,.22); color:#eaf6ff;
+  font-family:var(--num); font-size:19px; font-weight:700; backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px); transition:transform .08s, background .12s; user-select:none;}
+.tbtn:active,.tbtn.on{background:rgba(94,240,216,.32); border-color:rgba(94,240,216,.8); transform:scale(.94);}
+.tbtn.big{width:74px; height:74px; font-size:15px; letter-spacing:.04em;}
+.tbtn.jump{background:rgba(94,240,216,.16); border-color:rgba(94,240,216,.5);}
 
-  /* ---------- 타이틀 ---------- */
-  #screenTitle{place-items:stretch; background:linear-gradient(100deg, rgba(2,7,14,.92) 0%, rgba(2,7,14,.72) 34%, rgba(2,7,14,.18) 62%, rgba(2,6,12,.55) 100%); display:flex; align-items:center; justify-content:flex-start;}
-  #screenTitle:before{content:''; position:absolute; inset:0; background:linear-gradient(180deg, rgba(2,6,12,.55) 0%, rgba(0,0,0,0) 26%, rgba(0,0,0,0) 62%, rgba(2,6,12,.9) 100%); pointer-events:none;}
-  .title-wrap{padding:0 0 0 5vw; width:min(680px, 92vw); position:relative; z-index:2;}
-  .logo-line{display:flex; align-items:center; gap:12px; margin-bottom:6px;}
-  .logo-line .tag{font-family:var(--num); font-size:11px; letter-spacing:.34em; color:var(--accent); border:1px solid rgba(94,240,216,.45); padding:5px 10px; border-radius:999px; background:rgba(94,240,216,.08);}
-  h1.logo{
-    margin:0; font-family:var(--num); font-size:clamp(52px, 8.4vw, 104px); line-height:.92; letter-spacing:.02em;
-    font-weight:700; text-transform:uppercase;
-    background:linear-gradient(180deg,#ffffff 0%, #cfeaff 48%, #7fd9ff 100%);
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-    filter:drop-shadow(0 14px 40px rgba(0,0,0,.55));
-  }
-  .logo-sub{margin:8px 0 22px; color:var(--ink-dim); font-size:14px; letter-spacing:.06em; line-height:1.6;}
-  .logo-sub b{color:var(--ink);}
-  .title-actions{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:20px;}
-  .title-actions .btn{padding:14px 24px; font-size:15px;}
-  .map-strip{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px;}
-  .chip{
-    cursor:pointer; display:flex; align-items:center; gap:9px; padding:10px 14px; border-radius:13px;
-    background:rgba(8,16,28,.55); border:1px solid var(--stroke); font-size:13px; font-weight:700; transition:.18s;
-  }
-  .chip:hover{border-color:rgba(94,240,216,.5); transform:translateY(-1px);}
-  .chip.sel{border-color:var(--accent); box-shadow:0 0 0 1px rgba(94,240,216,.35), 0 10px 26px rgba(94,240,216,.16);}
-  .chip .glyph{font-size:12px; color:var(--accent);}
-  .chip .price{font-family:var(--num); font-size:12px; color:var(--gold); letter-spacing:.04em;}
-  .chip.locked{opacity:.85;}
-  .chip .lock{font-size:12px; color:var(--ink-dim);}
-  .hint{font-size:12px; color:var(--ink-dim); letter-spacing:.03em; line-height:1.9;}
-  .hint kbd{
-    font-family:var(--num); font-size:12px; padding:1px 6px; border-radius:6px;
-    background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.16); color:var(--ink);
-  }
+/* 일시정지 */
+#pause{position:fixed; inset:0; z-index:55; display:grid; place-items:center; padding:20px;
+  background:rgba(3,7,13,.7); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);}
+.pause-card{width:min(330px,92vw); padding:24px; text-align:center;}
+.pause-card h2{margin:0 0 4px; font-size:20px; font-weight:900;}
+.pause-card p{margin:0 0 18px; font-size:12px; color:#8aa4bb;}
+.pause-card .col{display:flex; flex-direction:column; gap:9px;}
 
-  /* ---------- 스토어 ---------- */
-  .shop-section{margin:6px 0 18px;}
-  .shop-section h3{margin:0 0 10px; font-size:13px; letter-spacing:.24em; color:var(--ink-dim); text-transform:uppercase; font-weight:700;}
-  .card-grid{display:grid; gap:12px;}
-  .card-grid.skins{grid-template-columns:repeat(4, 1fr);}
-  .card-grid.maps{grid-template-columns:repeat(3, 1fr);}
-  .card{
-    position:relative; text-align:left; padding:0; overflow:hidden; border-radius:16px; cursor:pointer;
-    background:rgba(255,255,255,.035); border:1px solid rgba(255,255,255,.12); color:var(--ink);
-    font-family:var(--font); transition:transform .16s ease, border-color .2s, box-shadow .2s;
-    display:flex; flex-direction:column;
-  }
-  .card:hover{transform:translateY(-3px); border-color:rgba(255,255,255,.3); box-shadow:0 18px 40px rgba(0,0,0,.45);}
-  .card.equipped{border-color:var(--accent); box-shadow:0 0 0 1px rgba(94,240,216,.4), 0 16px 40px rgba(94,240,216,.14);}
-  .card-art{height:104px; position:relative; display:grid; place-items:center;}
-  .card-art .glyph{font-size:34px; filter:drop-shadow(0 6px 14px rgba(0,0,0,.45));}
-  .card-art .badge{
-    position:absolute; top:9px; right:9px; font-family:var(--num); font-weight:700; font-size:12.5px;
-    letter-spacing:.04em; padding:4px 9px; border-radius:999px;
-    background:rgba(6,12,20,.72); border:1px solid rgba(255,255,255,.24); color:#fff;
-  }
-  .card-art .badge.price{background:linear-gradient(135deg,#ff9f43,#ff5f6d); border-color:transparent; box-shadow:0 6px 16px rgba(255,95,109,.4);}
-  .card-art .badge.free{background:rgba(94,240,216,.18); border-color:rgba(94,240,216,.5); color:#bffcf0;}
-  .card-art .badge.owned{background:rgba(94,240,216,.16); border-color:rgba(94,240,216,.45); color:#bffcf0;}
-  .card-art .badge.live{background:linear-gradient(135deg,var(--accent),#5ea8ff); color:#04131a; border-color:transparent;}
-  .card-body{padding:11px 13px 6px;}
-  .card-name{font-size:15px; font-weight:700; letter-spacing:.01em;}
-  .card-desc{font-size:11.5px; color:var(--ink-dim); margin-top:3px; line-height:1.5; min-height:34px;}
-  .card-foot{
-    margin-top:auto; padding:9px 13px 12px; display:flex; align-items:center; justify-content:space-between;
-    font-size:11.5px; color:var(--ink-dim); font-weight:700; letter-spacing:.06em;
-  }
-  .card-foot .cta{color:var(--ink);}
-  .card-foot .cta.buy{color:var(--gold);}
-  .card-foot .cta.on{color:var(--accent);}
-  .shop-note{font-size:11.5px; color:var(--ink-dim); border-top:1px solid rgba(255,255,255,.09); padding-top:12px; margin-top:4px; line-height:1.7;}
+/* toasts */
+#toasts{position:fixed; left:50%; bottom:84px; transform:translateX(-50%); z-index:50; display:flex;
+  flex-direction:column; gap:8px; align-items:center; pointer-events:none;}
+.toast{padding:10px 16px; border-radius:11px; font-size:12.5px; font-weight:700;
+  background:rgba(8,18,30,.86); border:1px solid rgba(94,240,216,.35); color:#dff7ff;
+  box-shadow:0 12px 30px rgba(0,0,0,.45); animation:toastIn .3s ease, toastOut .4s ease 2.2s forwards;}
+@keyframes toastIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:none;}}
+@keyframes toastOut{to{opacity:0; transform:translateY(-8px);}}
 
-  /* ---------- 결제 ---------- */
-  #purchase .modal{width:min(460px, 94vw); padding:24px;}
-  .pay-badge{
-    display:inline-block; font-size:11.5px; font-weight:800; letter-spacing:.14em; padding:6px 11px; border-radius:8px;
-    color:#1a1204; background:linear-gradient(135deg,#ffd479,#ffb03a); margin-bottom:16px;
-  }
-  .pay-title{font-size:24px; font-weight:800; margin:0 0 2px;}
-  .pay-price{font-family:var(--num); font-size:38px; font-weight:700; color:var(--gold); letter-spacing:.02em; margin-bottom:14px;}
-  .pay-lines{border-top:1px dashed rgba(255,255,255,.16); border-bottom:1px dashed rgba(255,255,255,.16); padding:12px 0; margin-bottom:16px;}
-  .pay-lines div{display:flex; justify-content:space-between; font-size:12.5px; color:var(--ink-dim); padding:5px 0; gap:12px;}
-  .pay-lines div b{color:var(--ink); font-weight:700;}
-  .pay-actions{display:flex; gap:10px;}
-  .pay-actions .btn{flex:1;}
-  #payStatus{font-size:12px; color:var(--accent); min-height:16px; margin-top:10px; letter-spacing:.02em;}
-
-  /* ---------- 결과 ---------- */
-  #screenResult .modal{width:min(520px,94vw); text-align:center; padding:28px;}
-  .res-kicker{font-size:11px; letter-spacing:.34em; color:var(--ink-dim); font-weight:700; margin-bottom:6px;}
-  .res-time{font-family:var(--num); font-size:64px; font-weight:700; line-height:1; letter-spacing:.01em;}
-  .res-medal{display:inline-flex; align-items:center; gap:8px; margin-top:10px; padding:7px 16px; border-radius:999px; font-weight:800; font-size:13px; letter-spacing:.1em; border:1px solid rgba(255,255,255,.2);}
-  .res-medal.gold{color:#241a03; background:linear-gradient(135deg,#ffe08a,#ffc23c); border-color:transparent;}
-  .res-medal.silver{color:#101820; background:linear-gradient(135deg,#eef4fb,#b9c9d8); border-color:transparent;}
-  .res-medal.bronze{color:#2a1408; background:linear-gradient(135deg,#f0b183,#c9783f); border-color:transparent;}
-  .res-medal.none{color:var(--ink-dim); background:rgba(255,255,255,.06);}
-  .res-rows{margin:18px 0 20px; border-top:1px solid rgba(255,255,255,.1);}
-  .res-rows div{display:flex; justify-content:space-between; padding:9px 2px; border-bottom:1px solid rgba(255,255,255,.07); font-size:13px; color:var(--ink-dim); font-weight:700; letter-spacing:.04em;}
-  .res-rows b{color:var(--ink); font-family:var(--num); font-size:15px; letter-spacing:.03em;}
-  .res-actions{display:flex; gap:10px;}
-  .res-actions .btn{flex:1;}
-  .newbest{color:var(--accent); font-size:12.5px; font-weight:800; letter-spacing:.14em; margin-top:8px;}
-
-  /* ---------- 토스트 ---------- */
-  #toast{
-    position:fixed; left:50%; bottom:96px; transform:translateX(-50%) translateY(14px);
-    background:rgba(6,14,24,.9); border:1px solid rgba(255,255,255,.18); color:var(--ink);
-    padding:11px 18px; border-radius:12px; font-size:13px; font-weight:700; letter-spacing:.02em;
-    opacity:0; transition:opacity .22s ease, transform .22s ease; z-index:40; pointer-events:none; max-width:80vw; text-align:center;
-  }
-  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
-
-  /* ---------- 터치 패드 ---------- */
-  #touchpad{display:none; gap:10px; pointer-events:auto;}
-  body.touch #touchpad{display:flex;}
-  #touchpad .tbtn{
-    width:64px; height:64px; border-radius:50%; border:1px solid rgba(255,255,255,.24);
-    background:rgba(10,20,34,.55); color:var(--ink); font-size:20px; font-weight:800;
-    display:grid; place-items:center; backdrop-filter:blur(10px);
-  }
-  #touchpad .tbtn:active{background:rgba(94,240,216,.28); border-color:var(--accent);}
-  #touchpad .tgroup{display:flex; gap:10px; align-items:flex-end;}
-  #touchpad .tbtn.jump{width:74px; height:74px; font-size:14px; letter-spacing:.06em;}
-
-  /* ---------- 로딩 ---------- */
-  #loading{position:fixed; inset:0; display:grid; place-items:center; background:#050b14; z-index:60; transition:opacity .5s ease;}
-  #loading .ld{text-align:center;}
-  #loading .bar{width:210px; height:3px; background:rgba(255,255,255,.14); border-radius:3px; overflow:hidden; margin:16px auto 0;}
-  #loading .bar i{display:block; height:100%; width:35%; background:linear-gradient(90deg,var(--accent),#5ea8ff); animation:slide 1.1s ease-in-out infinite;}
-  @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(320%)}}
-  #loading .t{font-family:var(--num); letter-spacing:.34em; font-size:12px; color:var(--ink-dim);}
-  #fatal{position:fixed; inset:0; display:none; place-items:center; background:#0a0f18; z-index:70; padding:24px; text-align:center; color:#ffb4b4; font-size:14px; line-height:1.8;}
-
-  @media (max-width: 860px){
-    .card-grid.skins{grid-template-columns:repeat(2,1fr);}
-    .card-grid.maps{grid-template-columns:1fr;}
-    .timer{font-size:40px;}
-    .speed-panel{min-width:150px; padding:11px 13px;}
-    .speedval{font-size:34px;}
-    .race-panel{min-width:0; padding:11px 13px;}
-    .hud-btns .btn{padding:8px 11px; font-size:12px;}
-    .title-wrap{padding:0 5vw;}
-    .hud-top{top:12px; left:12px; right:12px;}
-    .hud-bot{left:12px; right:12px; bottom:12px;}
-  }
-  @media (max-width: 700px){
-    .hud-top{gap:8px;}
-    .race-panel{flex:1 1 auto; padding:9px 12px 8px; border-radius:13px;}
-    .race-panel .maprow{font-size:9px; letter-spacing:.08em; gap:5px;}
-    .timer{font-size:30px; margin:4px 0 2px;}
-    .subrow{font-size:9.5px; gap:8px; letter-spacing:.02em;}
-    .gatebar{margin-top:6px; height:3px;}
-    .speed-panel{flex:0 0 auto; min-width:96px; padding:9px 11px; border-radius:13px;}
-    .speedval{font-size:26px;}
-    .speedval .unit{font-size:10px; margin-left:3px; letter-spacing:.1em;}
-    .speed-panel .line{font-size:8.5px; letter-spacing:.04em;}
-    .speed-panel .line b{font-size:11px;}
-    .speedbar{margin:5px 0 6px;}
-    .hud-bot{display:block; left:10px; right:10px; bottom:10px; height:auto;}
-    .hud-btns{position:absolute; left:0; bottom:0; display:flex; flex-wrap:wrap; gap:6px; max-width:150px;}
-    .hud-btns .btn{padding:7px 9px; font-size:10.5px; border-radius:9px; white-space:nowrap; letter-spacing:-.01em;}
-    #touchpad{position:absolute; right:0; bottom:0; gap:8px; align-items:flex-end; flex-direction:column;}
-    #touchpad .tbtn{width:54px; height:54px; font-size:17px;}
-    #touchpad .tbtn.jump{width:60px; height:60px; font-size:11.5px;}
-    #touchpad .tgroup{gap:8px;}
-    #trickFeed{position:absolute; right:0; bottom:72px; max-width:64%; align-items:flex-end;}
-    .trick-row{font-size:12px; padding:5px 9px;}
-    #airChip{bottom:auto; top:auto; left:50%; bottom:150px; font-size:14px; padding:7px 13px;}
-    #trickPop{font-size:30px; top:30%;}
-    #trickPop .sub{font-size:11px; letter-spacing:.2em;}
-    #countdown span{font-size:120px;}
-    .overlay{padding:10px;}
-    .modal{padding:16px; border-radius:16px;}
-    .modal-head h2{font-size:18px;}
-    .card-art{height:82px;}
-    .title-actions .btn{padding:11px 16px; font-size:13px;}
-    .logo-sub{font-size:12px;}
-    .hint{font-size:11px; line-height:1.8;}
-    #screenTitle{align-items:flex-end; padding-bottom:6vh;}
-  }
+@media (max-width:640px){
+  .race-panel{min-width:0; padding:9px 13px 8px;}
+  .timer{font-size:31px;} .timer small{font-size:15px;}
+  .speedo svg{width:58px; height:58px;} .speed-txt .v{font-size:29px;}
+  .hud-bl{display:none;}
+  #title .t-top{flex-direction:column;}
+  .key-hint{display:none;}
+  .res-card{padding:20px 18px 16px;}
+}
 </style>
+  <script type="module" crossorigin src="/carve-ski-game/assets/index-SE_E47u_.js"></script>
 </head>
 <body>
 <canvas id="app"></canvas>
-<div id="vignette"></div>
 
-<!-- ================= HUD ================= -->
+<!-- 로딩 -->
+<div id="loader">
+  <div class="load-box">
+    <div class="load-logo">CARVE RUSH</div>
+    <h1 class="load-title">알파인 카빙<br>레이싱 v2</h1>
+    <div class="load-sub">설면을 세우고, 라인을 그리세요.</div>
+    <div class="load-bar"><i id="loadFill"></i></div>
+    <div class="load-note" id="loadNote">BUILDING ALPINE WORLD…</div>
+  </div>
+</div>
+
+<!-- 타이틀 -->
+<div id="title" class="hidden">
+  <div class="t-top">
+    <div class="brand">
+      <div class="brand-kicker">WEBGL 3D ALPINE RACING</div>
+      <h1 class="brand-title">CARVE RUSH<span>2.0</span></h1>
+      <div class="brand-meta">
+        <div class="chip">TRACK <b id="metaMap">Larchwood Super-G</b></div>
+        <div class="chip">GATES <b>16</b></div>
+        <div class="chip">MODE <b id="metaMode">RACE</b></div>
+      </div>
+    </div>
+    <div class="t-side">
+      <div class="ghost-box panel">
+        <div class="lbl">BEST RUN</div>
+        <div class="val" id="bestTime">--:--.--</div>
+      </div>
+      <div class="equipped panel">
+        <div class="lbl">EQUIPPED</div>
+        <div class="val" id="equippedText">Classic Alpine · <em>Larchwood</em></div>
+      </div>
+    </div>
+  </div>
+  <div class="t-bottom">
+    <div class="menu">
+      <div class="row">
+        <button class="mode-btn race" id="btnRace"><b>RACE</b><i>16 게이트 · 타임 어택 · 고스트</i></button>
+        <button class="mode-btn park" id="btnPark"><b>PARK</b><i>킥커 · 레일 · 트릭</i></button>
+      </div>
+      <div class="menu-foot">
+        <button class="btn" id="btnShopTitle">스킨 &amp; 맵 상점</button>
+        <button class="btn ghost small" id="btnHelp">조작법</button>
+      </div>
+    </div>
+    <div class="key-hint">
+      <kbd>←</kbd><kbd>→</kbd> 카빙 · <kbd>↑</kbd> 턱 · <kbd>↓</kbd> 브레이크<br>
+      <kbd>SPACE</kbd> 점프 · <kbd>S</kbd> 상점 · <kbd>ESC</kbd> 일시정지
+    </div>
+  </div>
+</div>
+
+<!-- HUD -->
 <div id="hud" class="hidden">
   <div class="hud-top">
-    <div class="panel race-panel">
-      <div class="maprow"><span class="dot" id="hudGlyph">●</span><span id="hudMap">Larchwood Super-G</span><span id="hudModeTag" style="color:var(--accent-2)">RACE</span></div>
-      <div class="timer" id="hudTimer">0:00.000</div>
-      <div class="subrow"><span id="hudGate">Gate 0/16</span><span id="hudMedal">GOLD 30.000</span></div>
-      <div class="gatebar"><i id="gateFill"></i></div>
+    <div class="race-panel panel">
+      <div class="lbl"><span class="mode" id="hudMode">RACE</span><span id="hudCourse">LARCHWOOD SUPER-G</span></div>
+      <div class="timer"><span id="timeMain">0:00</span><small id="timeMs">.00</small></div>
+      <div class="race-sub">
+        <span>GATE <b id="gateNow">00</b>/<b id="gateTotal">16</b></span>
+        <span id="splitWrap">SPLIT <b id="splitVal">--</b></span>
+      </div>
     </div>
-    <div class="panel speed-panel">
-      <div class="speedval"><span id="hudSpeed">0</span><span class="unit">mph</span></div>
-      <div class="speedbar"><i id="speedFill"></i></div>
-      <div class="line"><span>BEST</span><b id="hudBest">--:--.---</b></div>
-      <div class="line"><span>GHOST</span><b id="hudGhost">ON</b></div>
+    <div class="hud-right">
+      <div class="speedo panel">
+        <svg viewBox="0 0 76 76">
+          <circle class="ring-bg" cx="38" cy="38" r="32"></circle>
+          <circle class="ring-fg" id="speedRing" cx="38" cy="38" r="32"></circle>
+        </svg>
+        <div class="speed-txt"><div class="v" id="speedVal">0</div><div class="u">KM/H</div></div>
+      </div>
+      <div class="air-badge hidden" id="airBadge">AIRTIME 0.0s</div>
     </div>
   </div>
-  <div id="trickPop"></div>
-  <div id="airChip" class="hidden"><span class="dot2"></span><span id="airChipText">SPIN 0°</span></div>
-  <div class="hud-bot">
-    <div class="hud-btns">
-      <button class="btn" id="btnShop">상점</button>
-      <button class="btn ghost" id="btnPause">일시정지</button>
-      <button class="btn ghost" id="btnMode">PARK</button>
-      <button class="btn ghost" id="btnRestart">재시작</button>
+  <div id="center"><div id="countdown"></div><div id="goFlash"></div></div>
+  <div id="judge"><div class="j-main" id="judgeMain">CLEAN LINE</div><div class="j-sub" id="judgeSub">+0.00</div></div>
+  <div class="hud-bl">
+    <div id="progressWrap" class="panel">
+      <div class="lbl"><span>COURSE</span><span id="progTxt">0%</span></div>
+      <div id="progressBar"><i id="progFill"></i></div>
     </div>
-    <div id="trickFeed"></div>
-    <div id="touchpad">
-      <div class="tgroup">
-        <button class="tbtn" data-key="left">◀</button>
-        <button class="tbtn" data-key="right">▶</button>
-      </div>
-      <div class="tgroup">
-        <button class="tbtn" data-key="down">▼</button>
-        <button class="tbtn jump" data-key="jump">JUMP</button>
-        <button class="tbtn" data-key="up">▲</button>
-      </div>
-    </div>
+  </div>
+  <div class="hud-br">
+    <button class="icon-btn" id="btnMute" title="사운드">🔊</button>
+    <button class="icon-btn" id="btnShopHud" title="상점">🛍️</button>
+    <button class="icon-btn" id="btnPause" title="일시정지">⏸</button>
   </div>
 </div>
 
-<!-- ================= 타이틀 ================= -->
-<div id="screenTitle" class="overlay">
-  <div class="title-wrap">
-    <div class="logo-line"><span class="tag">3D SKI PROTOTYPE</span></div>
-    <h1 class="logo">Carve<br>Rush</h1>
-    <p class="logo-sub">
-      슬라롬 16게이트 타임어택 <b>RACE</b> · 킥커와 레일 <b>PARK</b><br>
-      스킨과 코스를 잠금해제하고 나만의 라인을 새기세요.
-    </p>
-    <div class="map-strip" id="titleMapList"></div>
-    <div class="title-actions">
-      <button class="btn primary" id="btnRaceStart">RACE 시작</button>
-      <button class="btn" id="btnParkStart">PARK 프리라이드</button>
-      <button class="btn ghost" id="btnTitleShop">상점</button>
-    </div>
-    <p class="hint">
-      <kbd>←</kbd><kbd>→</kbd> 카빙 · <kbd>↑</kbd> 턱 가속 · <kbd>↓</kbd> 브레이크 · <kbd>Space</kbd> 점프 · <kbd>Esc</kbd> 일시정지 · <kbd>S</kbd> 상점
-    </p>
-  </div>
-</div>
-
-<!-- ================= 일시정지 ================= -->
-<div id="screenPause" class="overlay hidden">
-  <div class="modal" style="width:min(420px,94vw); text-align:center;">
-    <div class="res-kicker">PAUSED</div>
-    <h2 style="margin:6px 0 18px; font-size:26px;">일시정지</h2>
-    <div style="display:flex; flex-direction:column; gap:10px;">
-      <button class="btn primary" id="btnResume">계속하기</button>
-      <div style="display:flex; gap:10px;">
-        <button class="btn" id="btnPauseRestart" style="flex:1">재시작</button>
-        <button class="btn" id="btnPauseShop" style="flex:1">상점</button>
-      </div>
-      <button class="btn ghost" id="btnQuit">타이틀로</button>
-    </div>
-  </div>
-</div>
-
-<!-- ================= 결과 ================= -->
-<div id="screenResult" class="overlay hidden">
-  <div class="modal">
-    <div class="res-kicker">FINISH</div>
-    <div class="res-time" id="resTime">0:00.000</div>
-    <div id="resMedal" class="res-medal none">NO MEDAL</div>
-    <div class="newbest hidden" id="resNew">NEW PERSONAL BEST</div>
+<!-- 결과 -->
+<div id="result" class="hidden">
+  <div class="res-card panel">
+    <div class="res-kicker">RUN COMPLETE</div>
+    <div class="res-medal" id="resMedal">🥇</div>
+    <h2 class="res-title" id="resTitle">GOLD MEDAL</h2>
+    <div class="res-mode" id="resMode">RACE · LARCHWOOD SUPER-G</div>
     <div class="res-rows">
-      <div><span>GATES</span><b id="resGates">0 / 16</b></div>
-      <div><span>BEST</span><b id="resBest">--:--.---</b></div>
-      <div><span>GHOST</span><b id="resGhostInfo">저장됨</b></div>
+      <div class="res-row"><span class="k">TIME</span><span class="v" id="resTime">0:00.00</span></div>
+      <div class="res-row"><span class="k">BEST</span><span class="v" id="resBest">0:00.00</span></div>
+      <div class="res-row"><span class="k">DIFF</span><span class="v" id="resDiff">--</span></div>
+      <div class="res-row"><span class="k" id="resCleanK">CLEAN LINES</span><span class="v" id="resClean">0 / 0</span></div>
+      <div class="res-row"><span class="k">TOP SPEED</span><span class="v" id="resTop">0 km/h</span></div>
     </div>
     <div class="res-actions">
-      <button class="btn primary" id="btnRetry">재도전</button>
-      <button class="btn" id="btnResShop">상점</button>
-      <button class="btn ghost" id="btnResQuit">타이틀</button>
+      <button class="btn primary" id="btnRetry">다시 타기</button>
+      <button class="btn" id="btnToTitle">메뉴</button>
     </div>
   </div>
 </div>
 
-<!-- ================= 상점 ================= -->
-<div id="shop" class="overlay hidden">
-  <div class="modal">
-    <div class="modal-head">
+<!-- 상점 -->
+<div id="shop" class="hidden">
+  <div class="shop-card panel">
+    <div class="shop-head">
       <div>
-        <div class="kicker">STORE</div>
         <h2>스킨 &amp; 맵 상점</h2>
+        <div class="sub">테스트 결제 모드 — 실제 금액이 청구되지 않으며 잠금 해제는 이 브라우저에 저장됩니다.</div>
       </div>
-      <button class="xbtn" id="shopClose" aria-label="닫기">✕</button>
+      <button class="btn small shop-close" id="btnShopClose">닫기 ✕</button>
     </div>
     <div class="shop-section">
-      <h3>스킨 · SKIER SUIT &amp; TRAIL</h3>
-      <div class="card-grid skins" id="shopSkins"></div>
+      <h3>RIDER SKINS</h3>
+      <div class="shop-grid" id="skinGrid"></div>
     </div>
     <div class="shop-section">
-      <h3>맵 · COURSE</h3>
-      <div class="card-grid maps" id="shopMaps"></div>
+      <h3>ALPINE MAPS</h3>
+      <div class="shop-grid" id="mapGrid"></div>
     </div>
     <div class="shop-note">
-      테스트 결제 모드입니다. 실제 카드 결제는 발생하지 않으며, 잠금해제 기록은 브라우저 localStorage에 저장됩니다.
-      실제 서비스에서는 <b>Stripe / 토스페이먼츠</b> 결제 후 서버에서 권한을 부여하는 구조로 교체합니다.
+      <b>결제 연동 지점:</b> <code>src/services/store.js</code> 의 <code>purchase()</code> 가 이 프로토타입에서는
+      로컬 테스트 결제로 잠금 해제를 부여합니다. 실서비스에서는 서버 결제(Stripe / 토스페이먼츠) 확인 콜백에서
+      <code>grant()</code> 를 호출하도록 교체하면 게임 코드는 그대로 유지됩니다.
     </div>
   </div>
 </div>
 
-<!-- ================= 테스트 결제 ================= -->
-<div id="purchase" class="overlay hidden">
-  <div class="modal">
-    <div class="pay-badge">[테스트 결제 잠금해제]</div>
-    <h3 class="pay-title" id="payName">Neon Cyber</h3>
-    <div class="pay-price" id="payPrice">$2.99</div>
-    <div class="pay-lines">
-      <div><span>상품</span><b id="payKind">스킨</b></div>
-      <div><span>결제 수단</span><b>테스트 카드 •••• 4242</b></div>
-      <div><span>처리</span><b>즉시 잠금해제 · localStorage</b></div>
+<!-- 일시정지 -->
+<div id="pause" class="hidden">
+  <div class="pause-card panel">
+    <h2>PAUSED</h2>
+    <p>잠시 설면 위에서 숨을 고르는 중</p>
+    <div class="col">
+      <button class="btn primary" id="btnResume">계속 타기</button>
+      <button class="btn" id="btnRestart">다시 시작</button>
+      <button class="btn ghost" id="btnQuit">메뉴로</button>
     </div>
-    <div class="pay-actions">
-      <button class="btn" id="payCancel">취소</button>
-      <button class="btn primary" id="payConfirm">결제 잠금해제</button>
-    </div>
-    <div id="payStatus"></div>
   </div>
 </div>
 
-<div id="toast"></div>
-<div id="countdown" class="hidden"><span id="countdownText">3</span></div>
+<div id="toasts"></div>
 
-<div id="loading">
-  <div class="ld">
-    <div class="t">CARVE RUSH · LOADING</div>
-    <div class="bar"><i></i></div>
+<!-- 터치 -->
+<div id="touch" class="hidden">
+  <div class="t-zone l">
+    <div class="tbtn" id="tLeft">◀</div>
+    <div class="tbtn" id="tRight">▶</div>
+  </div>
+  <div class="t-zone r">
+    <div class="tbtn" id="tBrake">▼</div>
+    <div class="tbtn jump" id="tJump">AIR</div>
+    <div class="tbtn" id="tTuck">▲</div>
   </div>
 </div>
-<div id="fatal"></div>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="spd" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5ef0d8"/>
+      <stop offset="60%" stop-color="#41b7ff"/>
+      <stop offset="100%" stop-color="#ff5fa2"/>
+    </linearGradient>
+  </defs>
+</svg>
 
-<script>
-  // CDN(three.js) 로드 실패 시 안내
-  setTimeout(function(){
-    if (!window.__carve || !window.__carve.ready){
-      var l = document.getElementById('loading');
-      if (l) l.innerHTML = '<div style="max-width:420px;text-align:center;color:#9fb4c9;font-size:13px;line-height:1.9;padding:0 20px">' +
-        'Three.js CDN(unpkg.com)을 불러오지 못했습니다.<br>인터넷 연결을 확인하거나, three.js를 로컬에 두고 importmap 경로를 바꿔 주세요.' +
-        '<br><span style="opacity:.6;font-size:11px">오프라인 실행은 지원되지 않습니다.</span></div>';
-    }
-  }, 12000);
-</script>
-
-<script type="module">
-import * as THREE from 'three';
-
-/* ==================================================================
-   CARVE RUSH — 3D 스키 프로토타입 (single file)
-   ------------------------------------------------------------------
-   구조
-     0) 유틸
-     1) 카탈로그(스킨/맵) + 서비스 레이어(LeaderboardService, StoreService)
-     2) 씬 / 월드 빌드 (지형, 게이트, 파크 피처, 프롭)
-     3) 스키어 + 이펙트(스프레이, 스키 자국)
-     4) 물리 & 게임 루프
-     5) UI (HUD, 타이틀, 상점, 결제, 결과)
-   ================================================================== */
-
-/* ---------------------------------------------------------------- 0 */
-const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-const lerp = (a, b, t) => a + (b - a) * t;
-const damp = (cur, target, lambda, dt) => lerp(cur, target, 1 - Math.exp(-lambda * dt));
-const $ = (id) => document.getElementById(id);
-const money = (n) => '$' + n.toFixed(2);
-
-function fmtTime(sec){
-  if (!isFinite(sec)) return '--:--.---';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  const ms = Math.floor((sec % 1) * 1000);
-  return `${m}:${String(s).padStart(2,'0')}.${String(ms).padStart(3,'0')}`;
-}
-function seedRng(seed){
-  let s = seed >>> 0;
-  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
-}
-
-/* ---------------------------------------------------------------- 1 */
-
-const SKINS = [
-  {
-    id:'classic', kind:'skin', name:'Classic Alpine', price:0,
-    desc:'기본 알파인 슈트. 화이트 & 크림슨.',
-    suit:0xeef4fc, accent:0xd6403f, pants:0x1d2733, helmet:0x2c3b4d, trail:0x9fb6c9, glow:0,
-    preview:'linear-gradient(135deg,#eef4fc 0%,#cddff0 52%,#d6403f 100%)'
-  },
-  {
-    id:'neon', kind:'skin', name:'Neon Cyber', price:2.99,
-    desc:'시안 네온 슈트. 스키 자국이 빛납니다.',
-    suit:0x14e0d2, accent:0xff3ec8, pants:0x0d1826, helmet:0x0b1522, trail:0x46f7ff, glow:0x22e6ff,
-    preview:'linear-gradient(135deg,#0a1a2a 0%,#14e0d2 46%,#ff3ec8 100%)'
-  },
-  {
-    id:'crimson', kind:'skin', name:'Crimson Pro', price:3.99,
-    desc:'딥 레드 레이싱 슈트 + 골드 트림.',
-    suit:0xbe1f2b, accent:0xf5cf7a, pants:0x14161d, helmet:0x8d1420, trail:0xff7a5c, glow:0,
-    preview:'linear-gradient(135deg,#7c0f18 0%,#d4262f 55%,#f5cf7a 100%)'
-  },
-  {
-    id:'golden', kind:'skin', name:'Golden Legend', price:4.99,
-    desc:'한정 골드 슈트. 트레일이 황금빛으로 빛납니다.',
-    suit:0xf5c33a, accent:0xfff3c4, pants:0x2a1f08, helmet:0xc99a1f, trail:0xffd76a, glow:0xffc83d,
-    preview:'linear-gradient(135deg,#6b4400 0%,#f5c33a 50%,#fff3c4 100%)'
-  }
-];
-
-const MAPS = [
-  {
-    id:'larchwood', kind:'map', name:'Larchwood Super-G', glyph:'●', price:0,
-    blurb:'낙엽송 숲 사이로 이어지는 와이드 슈퍼-G.',
-    slope:0.31, length:760, pisteHalf:34, gateX:9.5, seed:11, roll:0.9,
-    fog:{color:0xbdd6ea, near:120, far:760},
-    sky:{top:'#17558f', bottom:'#d3e6f6'},
-    sun:{color:0xfff3da, intensity:1.95, pos:[80,150,40]},
-    hemi:{sky:0xdcecff, ground:0x93a9bb, intensity:1.05},
-    snow:0xe9f1fb, offSnow:0xd6e4f1, rock:0x8b96a3, tree:0x2f6046, trunk:0x4d3b2b,
-    treeCount:110, rockCount:34, marker:0xff7a3d,
-    medal:{gold:36, silver:43, bronze:52},
-    storeCss:'linear-gradient(135deg,#0d2438 0%,#2f6046 45%,#cfe3f5 100%)'
-  },
-  {
-    id:'glacier', kind:'map', name:'Glacier Black Diamond', glyph:'◆', price:4.99,
-    blurb:'빙벽 사이 급경사 코스. 좁고 빠릅니다.',
-    slope:0.38, length:720, pisteHalf:26, gateX:8.5, seed:29, roll:0.75,
-    fog:{color:0xa9c0d6, near:90, far:620},
-    sky:{top:'#3d4d63', bottom:'#c3d3e2'},
-    sun:{color:0xdfeaff, intensity:1.6, pos:[-70,140,-30]},
-    hemi:{sky:0xcfdff2, ground:0x7f8f9f, intensity:0.9},
-    snow:0xdfeaf7, offSnow:0xc2d2e2, rock:0x5d6a78, tree:0x294638, trunk:0x3c332a,
-    treeCount:34, rockCount:72, marker:0x2ee6ff,
-    medal:{gold:34, silver:41, bronze:50},
-    storeCss:'linear-gradient(135deg,#0b1622 0%,#4a6377 50%,#dbeeff 100%)'
-  },
-  {
-    id:'midnight', kind:'map', name:'Midnight Neon Park', glyph:'★', price:5.99,
-    blurb:'네온 조명 아래 펼쳐지는 나이트 파크.',
-    slope:0.33, length:700, pisteHalf:32, gateX:9, seed:47, roll:1.0,
-    night:true,
-    fog:{color:0x120a26, near:100, far:700},
-    sky:{top:'#050318', bottom:'#2a1150'},
-    sun:{color:0xa9c8ff, intensity:0.9, pos:[-60,120,-80]},
-    hemi:{sky:0x6d5cff, ground:0x1a0f33, intensity:1.15},
-    snow:0xd8e2ff, offSnow:0x9fa8e0, rock:0x3a2f5c, tree:0x1a1430, trunk:0x201a30,
-    treeCount:66, rockCount:26, marker:0xff3ec8,
-    medal:{gold:35, silver:42, bronze:51},
-    storeCss:'linear-gradient(135deg,#0a0718 0%,#3a1a6e 45%,#ff3ec8 100%)'
-  }
-];
-
-const mapById = (id) => MAPS.find(m => m.id === id) || MAPS[0];
-const skinById = (id) => SKINS.find(s => s.id === id) || SKINS[0];
-
-/* ==================================================================
-   LeaderboardService
-   ------------------------------------------------------------------
-   랭킹/고스트 저장 인터페이스. 지금은 localStorage 데모 구현.
-   Supabase 로 교체할 때는 아래 4개 메서드의 내부만 바꾸면 된다.
-     getBest(mapId, mode) -> {time, gates, at} | null
-     submit(run)          -> {isNewBest, best, top}
-     getGhost(mapId)      -> frames[] | null
-     saveGhost(mapId, f)  -> void
-   (localStorage 데모는 동기 구현이다. Supabase 로 옮길 때는 이 4개를
-    async 로 바꾸고 startRun/finishRun 에서 await 만 붙이면 된다.)
-   ================================================================== */
-class LeaderboardService {
-  constructor(prefix = 'carve.lb.v1'){
-    this.prefix = prefix;
-  }
-  _key(mapId, mode){ return `${mapId}:${mode}`; }
-  _read(){
-    try { return JSON.parse(localStorage.getItem(this.prefix) || '{}'); }
-    catch(e){ return {}; }
-  }
-  _write(db){ localStorage.setItem(this.prefix, JSON.stringify(db)); }
-
-  getBest(mapId, mode = 'race'){
-    const db = this._read();
-    const e = db[this._key(mapId, mode)];
-    return e ? { time:e.time, gates:e.gates, at:e.at } : null;
-  }
-  getTop(mapId, mode = 'race', n = 5){
-    const db = this._read();
-    return (db[this._key(mapId, mode) + ':top'] || []).slice(0, n);
-  }
-  submit({ mapId, mode = 'race', time, gates = 0, tricks = 0 }){
-    const db = this._read();
-    const k = this._key(mapId, mode);
-    const prev = db[k] || null;
-    const entry = { time, gates, tricks, at: new Date().toISOString() };
-    const isNewBest = !prev || time < prev.time;
-    if (isNewBest) db[k] = entry;
-    else db[k + ':last'] = entry;
-    const top = (db[k + ':top'] || []).concat([entry])
-      .sort((a,b) => a.time - b.time).slice(0, 5);
-    db[k + ':top'] = top;
-    this._write(db);
-    return { isNewBest, best: isNewBest ? entry : prev, top };
-  }
-  getGhost(mapId){
-    try { return JSON.parse(localStorage.getItem(this.prefix + '.ghost.' + mapId) || 'null'); }
-    catch(e){ return null; }
-  }
-  saveGhost(mapId, frames){
-    try { localStorage.setItem(this.prefix + '.ghost.' + mapId, JSON.stringify(frames)); return true; }
-    catch(e){ return false; }
-  }
-}
-
-/* ==================================================================
-   StoreService
-   ------------------------------------------------------------------
-   스킨/맵 잠금해제 인터페이스. 지금은 "테스트 결제" + localStorage.
-   실제 결제 연동 시:
-     purchase(id) -> 서버에 Stripe PaymentIntent / 토스페이먼츠 결제 생성
-                  -> 결제 confirm 성공 콜백에서 grant(id) 호출
-     isOwned(id)  -> 서버 응답(엔타이틀먼트)으로 대체
-   ================================================================== */
-class StoreService {
-  constructor(key = 'carve.store.v1'){
-    this.key = key;
-    this.items = [...SKINS, ...MAPS];
-  }
-  _state(){
-    let s = null;
-    try { s = JSON.parse(localStorage.getItem(this.key) || 'null'); } catch(e){ s = null; }
-    if (!s || typeof s !== 'object') s = {};
-    if (!Array.isArray(s.owned)) s.owned = [];
-    if (!Array.isArray(s.purchases)) s.purchases = [];
-    if (!s.equipped) s.equipped = {};
-    if (!s.equipped.skin) s.equipped.skin = 'classic';
-    if (!s.equipped.map) s.equipped.map = 'larchwood';
-    return s;
-  }
-  _save(s){ localStorage.setItem(this.key, JSON.stringify(s)); }
-
-  list(kind){
-    return this.items.filter(i => i.kind === kind).map(i => ({
-      ...i, owned: this.isOwned(i.id), equipped: this.isEquipped(i.id)
-    }));
-  }
-  getItem(id){ return this.items.find(i => i.id === id) || null; }
-  isOwned(id){
-    const item = this.getItem(id);
-    if (!item) return false;
-    if (item.price === 0) return true;
-    return this._state().owned.includes(id);
-  }
-  isEquipped(id){
-    const item = this.getItem(id);
-    if (!item) return false;
-    const s = this._state();
-    return item.kind === 'skin' ? s.equipped.skin === id : s.equipped.map === id;
-  }
-  equipped(kind){
-    const s = this._state();
-    return kind === 'skin' ? s.equipped.skin : s.equipped.map;
-  }
-  /* 테스트 결제: 실제 과금 없음 */
-  async purchase(id){
-    const item = this.getItem(id);
-    if (!item) throw new Error('unknown item: ' + id);
-    if (this.isOwned(id)) return { status: 'already_owned', item };
-    await new Promise(r => setTimeout(r, 650));
-    const s = this._state();
-    const receipt = 'test_' + Math.random().toString(36).slice(2, 10).toUpperCase();
-    s.owned.push(id);
-    s.purchases.push({ id, price: item.price, at: new Date().toISOString(), method: 'test-card-4242', receipt });
-    this._save(s);
-    return { status: 'succeeded', item, receipt };
-  }
-  equip(id){
-    const item = this.getItem(id);
-    if (!item || !this.isOwned(id)) return false;
-    const s = this._state();
-    if (item.kind === 'skin') s.equipped.skin = id; else s.equipped.map = id;
-    this._save(s);
-    return true;
-  }
-  reset(){
-    localStorage.removeItem(this.key);
-  }
-}
-
-const leaderboard = new LeaderboardService();
-const store = new StoreService();
-
-/* ---------------------------------------------------------------- 1.5 상태 */
-const state = {
-  phase:'title',        // title | countdown | play | finish
-  paused:false,
-  mode:'race',          // race | park
-  mapId: store.equipped('map'),
-  skinId: store.equipped('skin'),
-  countdown:0,
-  time:0,
-  gatesPassed:0,
-  gates:[],
-  finishZ:0,
-  bestTrick:0,
-  trickCount:0,
-  sessionScore:0,
-  ghostFrames:[],
-  ghostEnabled:true,
-  ghostIndex:0,
-  medal:null,
-  lastResult:null,
-  trickLog:[]
-};
-
-const skier = {
-  x:0, y:0, z:0, prevZ:0, prevX:0, heading:0, speed:0, vy:0,
-  airborne:false, airTime:0, spin:0, lean:0, leanVisual:0,
-  grinding:false, grindTime:0, grindFeature:null,
-  crouch:0, dist:0, wipeoutT:0
-};
-
-const input = { left:false, right:false, up:false, down:false, jumpQueued:false };
-const P = {
-  turn: 2.05, turnLow: 1.05, carveLoss: 0.17,
-  dragTuck: 0.00215, dragNormal: 0.0038, rollFric: 0.42,
-  brake: 8.5, gravity: 9.81, airGravity: 26.0, maxSpeed: 46
-};
-
-/* ---------------------------------------------------------------- 2 씬 */
-const canvas = $('app');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
-renderer.setSize(window.innerWidth, window.innerHeight, false);
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.02;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.4, 2400);
-camera.position.set(0, 6, 12);
-
-const camLook = new THREE.Vector3(0, 0, -20);
-const world = new THREE.Group();
-scene.add(world);
-
-const hemiLight = new THREE.HemisphereLight(0xdcecff, 0x93a9bb, 0.85);
-scene.add(hemiLight);
-const sunLight = new THREE.DirectionalLight(0xfff3da, 2.2);
-sunLight.castShadow = true;
-sunLight.shadow.mapSize.set(1024, 1024);
-sunLight.shadow.camera.near = 1;
-sunLight.shadow.camera.far = 260;
-sunLight.shadow.camera.left = -32;
-sunLight.shadow.camera.right = 32;
-sunLight.shadow.camera.top = 32;
-sunLight.shadow.camera.bottom = -32;
-sunLight.shadow.bias = -0.0012;
-sunLight.shadow.normalBias = 0.02;
-scene.add(sunLight);
-scene.add(sunLight.target);
-
-let skyDome = null;
-function buildSky(map){
-  if (skyDome){ world.remove(skyDome); skyDome.geometry.dispose(); skyDome.material.dispose(); skyDome = null; }
-  const geo = new THREE.SphereGeometry(1500, 32, 16);
-  const mat = new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms:{
-      topColor:{ value: new THREE.Color(map.sky.top) },
-      bottomColor:{ value: new THREE.Color(map.sky.bottom) },
-      offset:{ value: 260 }, exponent:{ value: 0.82 }
-    },
-    vertexShader: `
-      varying vec3 vWorld;
-      void main(){
-        vec4 wp = modelMatrix * vec4(position, 1.0);
-        vWorld = wp.xyz;
-        gl_Position = projectionMatrix * viewMatrix * wp;
-      }`,
-    fragmentShader: `
-      uniform vec3 topColor; uniform vec3 bottomColor;
-      uniform float offset; uniform float exponent;
-      varying vec3 vWorld;
-      void main(){
-        float h = normalize(vWorld + vec3(0.0, offset, 0.0)).y;
-        float t = pow(max(h, 0.0), exponent);
-        gl_FragColor = vec4(mix(bottomColor, topColor, t), 1.0);
-      }`
-  });
-  skyDome = new THREE.Mesh(geo, mat);
-  skyDome.frustumCulled = false;
-  world.add(skyDome);
-}
-
-/* --- 지형 함수 (물리와 메시가 공유) --- */
-function terrainHeight(map, x, z){
-  const s = -z;
-  let y = -s * map.slope;
-  y += Math.sin(s * 0.0105 + map.seed) * map.roll;
-  y += Math.sin(s * 0.043 + x * 0.021) * map.roll * 0.42;
-  y += Math.sin(x * 0.055 + s * 0.026) * 0.45;
-  const ax = Math.abs(x);
-  if (ax > map.pisteHalf){
-    const t = ax - map.pisteHalf;
-    y += Math.min(Math.pow(t / 15, 1.65) * 2.3, 34) + Math.max(0, t - 70) * 0.22;
-  }
-  return y;
-}
-
-/* --- 텍스처 --- */
-function makeSnowTexture(base){
-  const c = document.createElement('canvas'); c.width = c.height = 256;
-  const g = c.getContext('2d');
-  g.fillStyle = base; g.fillRect(0,0,256,256);
-  for (let i = 0; i < 256; i += 8){
-    g.fillStyle = (i % 16 === 0) ? 'rgba(150,182,215,.13)' : 'rgba(255,255,255,.22)';
-    g.fillRect(i, 0, 2, 256);
-  }
-  g.fillStyle = 'rgba(120,158,196,.05)';
-  for (let i = 0; i < 256; i += 32) g.fillRect(0, i, 256, 3);
-  const rnd = seedRng(7);
-  for (let i = 0; i < 900; i++){
-    const x = rnd()*256, y = rnd()*256, r = rnd()*1.5 + 0.3;
-    g.fillStyle = `rgba(255,255,255,${0.12 + rnd()*0.3})`;
-    g.beginPath(); g.arc(x, y, r, 0, 6.283); g.fill();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 4;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function makeSpriteTexture(){
-  const c = document.createElement('canvas'); c.width = c.height = 64;
-  const g = c.getContext('2d');
-  const grd = g.createRadialGradient(32,32,0,32,32,32);
-  grd.addColorStop(0,'rgba(255,255,255,1)');
-  grd.addColorStop(0.45,'rgba(255,255,255,.55)');
-  grd.addColorStop(1,'rgba(255,255,255,0)');
-  g.fillStyle = grd; g.fillRect(0,0,64,64);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-const SPRITE = makeSpriteTexture();
-
-function makeBannerTexture(label, bg, fg = '#ffffff'){
-  const c = document.createElement('canvas'); c.width = 512; c.height = 96;
-  const g = c.getContext('2d');
-  g.fillStyle = bg; g.fillRect(0,0,512,96);
-  g.fillStyle = 'rgba(255,255,255,.16)';
-  g.fillRect(0, 0, 512, 4);
-  g.font = '800 52px "Rajdhani", "Noto Sans KR", sans-serif';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillStyle = fg;
-  g.fillText(label, 256, 52);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  return t;
-}
-
-/* --- 월드 빌드 --- */
-let terrainMesh = null;
-let propsGroup = null;
-let courseGroup = null;
-let parkGroup = null;
-
-function buildTerrain(map){
-  if (terrainMesh){ world.remove(terrainMesh); terrainMesh.geometry.dispose(); terrainMesh.material.dispose(); }
-  const W = 400, xSeg = 96, zSeg = 150;
-  const zStart = 70, zEnd = -(map.length + 110);
-  const pos = [], col = [], uv = [], idx = [];
-  const cSnow = new THREE.Color(map.snow);
-  const cOff = new THREE.Color(map.offSnow);
-  const cRock = new THREE.Color(map.rock);
-
-  for (let j = 0; j <= zSeg; j++){
-    const z = lerp(zStart, zEnd, j / zSeg);
-    for (let i = 0; i <= xSeg; i++){
-      const x = lerp(-W/2, W/2, i / xSeg);
-      const y = terrainHeight(map, x, z);
-      pos.push(x, y, z);
-      const ax = Math.abs(x);
-      const c = cSnow.clone();
-      if (ax > map.pisteHalf){
-        c.lerp(cOff, clamp((ax - map.pisteHalf) / 14, 0, 1) * 0.8);
-        if (ax > map.pisteHalf + 22) c.lerp(cRock, clamp((ax - map.pisteHalf - 22) / 26, 0, 1) * 0.5);
-      }
-      const n = Math.sin(x * 0.31 + z * 0.17) * 0.5 + Math.sin(x * 0.11 - z * 0.23) * 0.5;
-      const n2 = Math.sin(x * 0.045 + z * 0.031) * 0.5 + Math.sin(x * 0.013 - z * 0.017) * 0.5;
-      c.offsetHSL(0, 0.01, n * 0.012 + n2 * 0.028);
-      if (n2 > 0.55) c.lerp(new THREE.Color(0xbcd4ea), 0.10);
-      col.push(c.r, c.g, c.b);
-      uv.push(x / 9, -z / 9);
-    }
-  }
-  for (let j = 0; j < zSeg; j++){
-    for (let i = 0; i < xSeg; i++){
-      const a = j * (xSeg + 1) + i, b = a + 1, c = a + xSeg + 1, d = c + 1;
-      idx.push(a, b, c, b, d, c);
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geo.setIndex(idx);
-  geo.computeVertexNormals();
-
-  const mat = new THREE.MeshStandardMaterial({
-    map: makeSnowTexture(map.snow === 0xf3f8fe ? '#f5f9ff' : (map.night ? '#dfe6ff' : '#eaf2fb')),
-    vertexColors: true, roughness: 0.94, metalness: 0.0
-  });
-  terrainMesh = new THREE.Mesh(geo, mat);
-  terrainMesh.receiveShadow = true;
-  world.add(terrainMesh);
-}
-
-function buildProps(map){
-  if (propsGroup){ world.remove(propsGroup); disposeTree(propsGroup); propsGroup = null; }
-  propsGroup = new THREE.Group();
-  world.add(propsGroup);
-
-  const rnd = seedRng(map.seed * 977 + 5);
-  const treeMat = new THREE.MeshStandardMaterial({
-    color: map.tree, roughness: 0.9, metalness: 0.02,
-    emissive: new THREE.Color(map.night ? 0x1b0f3a : 0x000000),
-    emissiveIntensity: map.night ? 0.35 : 0
-  });
-  const trunkMat = new THREE.MeshStandardMaterial({ color: map.trunk, roughness: 1 });
-
-  // 나무
-  const coneGeo = new THREE.ConeGeometry(2.0, 9.5, 7);
-  const trunkGeo = new THREE.CylinderGeometry(0.28, 0.42, 3.0, 6);
-  const trees = new THREE.InstancedMesh(coneGeo, treeMat, map.treeCount);
-  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, map.treeCount);
-  trees.castShadow = true; trees.receiveShadow = false;
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
-  for (let i = 0; i < map.treeCount; i++){
-    const side = rnd() < 0.5 ? -1 : 1;
-    const x = side * (map.pisteHalf + 9 + rnd() * 110);
-    const z = 40 - rnd() * (map.length + 40);
-    const y = terrainHeight(map, x, z);
-    const sc = 0.62 + rnd() * 0.95;
-    p.set(x, y + 5.4 * sc, z);
-    q.setFromEuler(new THREE.Euler(0, rnd() * Math.PI * 2, 0));
-    s.set(sc, sc, sc);
-    m.compose(p, q, s);
-    trees.setMatrixAt(i, m);
-    p.set(x, y + 1.5 * sc, z);
-    m.compose(p, q, s);
-    trunks.setMatrixAt(i, m);
-  }
-  propsGroup.add(trees, trunks);
-
-  // 바위
-  const rockGeo = new THREE.DodecahedronGeometry(1.9, 0);
-  const rockMat = new THREE.MeshStandardMaterial({ color: map.rock, roughness: 0.95, metalness: 0.06, flatShading: true });
-  const rocks = new THREE.InstancedMesh(rockGeo, rockMat, map.rockCount);
-  rocks.castShadow = true;
-  for (let i = 0; i < map.rockCount; i++){
-    const side = rnd() < 0.5 ? -1 : 1;
-    const x = side * (map.pisteHalf + 3 + rnd() * 95);
-    const z = 20 - rnd() * (map.length + 20);
-    const y = terrainHeight(map, x, z);
-    const sc = 0.5 + rnd() * 1.5;
-    p.set(x, y + 0.4 * sc, z);
-    q.setFromEuler(new THREE.Euler(rnd(), rnd() * 6.28, rnd()));
-    s.set(sc, sc * (0.5 + rnd() * 0.5), sc);
-    m.compose(p, q, s);
-    rocks.setMatrixAt(i, m);
-  }
-  propsGroup.add(rocks);
-
-  // 코스 가장자리 마커
-  const markerMat = new THREE.MeshStandardMaterial({
-    color: map.marker, roughness: 0.5, metalness: 0.1,
-    emissive: new THREE.Color(map.marker), emissiveIntensity: map.night ? 1.6 : 0.15
-  });
-  const markerGeo = new THREE.CylinderGeometry(0.12, 0.12, 2.2, 6);
-  const markerCount = Math.floor(map.length / 26) * 2;
-  const markers = new THREE.InstancedMesh(markerGeo, markerMat, markerCount);
-  let mi = 0;
-  for (let sDist = 20; sDist < map.length - 10 && mi < markerCount; sDist += 26){
-    for (const side of [-1, 1]){
-      if (mi >= markerCount) break;
-      const x = side * (map.pisteHalf - 1.5);
-      const z = -sDist;
-      const y = terrainHeight(map, x, z);
-      p.set(x, y + 1.0, z);
-      q.identity(); s.set(1,1,1);
-      m.compose(p, q, s);
-      markers.setMatrixAt(mi++, m);
-    }
-  }
-  propsGroup.add(markers);
-
-  // 원경 산봉우리 (깊이감) — 안개 밖, 하늘과 동조
-  {
-    const farY = terrainHeight(map, 0, -(map.length + 260));
-    const mtnMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(map.night ? 0x241641 : (map.id === 'glacier' ? 0x8fa3b6 : 0xb6cfe4)),
-      fog: false
-    });
-    const mtnMatFar = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(map.night ? 0x1a1033 : (map.id === 'glacier' ? 0xa4b7c9 : 0xc9dcee)),
-      fog: false
-    });
-    const r3 = seedRng(map.seed * 31 + 3);
-    for (let i = 0; i < 14; i++){
-      const spread = (i / 13) - 0.5;
-      const ang = Math.PI + spread * 1.9 + (r3() - 0.5) * 0.12;
-      const dist = 1000 + r3() * 600;
-      const h = 230 + r3() * 220;
-      const r = 260 + r3() * 220;
-      const geo = new THREE.ConeGeometry(r, h, 4, 1);
-      const m = new THREE.Mesh(geo, i % 2 === 0 ? mtnMatFar : mtnMat);
-      m.position.set(Math.sin(ang) * dist, farY - h * 0.55 + (r3() - 0.5) * 60, Math.cos(ang) * dist - 120);
-      m.rotation.y = r3() * Math.PI;
-      propsGroup.add(m);
-    }
-  }
-
-  // 스타트 아치 (항상 보임)
-  {
-    const startTex = makeBannerTexture('START  ·  CARVE RUSH', '#0f2536');
-    const startGroup = new THREE.Group();
-    const sy = terrainHeight(map, 0, 14);
-    const banner = new THREE.Mesh(
-      new THREE.PlaneGeometry(34, 2.0),
-      new THREE.MeshBasicMaterial({ map: startTex, transparent: true, side: THREE.DoubleSide })
-    );
-    banner.position.set(0, sy + 5.2, 14);
-    startGroup.add(banner);
-    for (const side of [-1, 1]){
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 5.2, 8),
-        new THREE.MeshStandardMaterial({ color: 0x0f2536, roughness: 0.6 }));
-      post.position.set(side * 17, sy + 2.6, 14);
-      post.castShadow = true;
-      startGroup.add(post);
-    }
-    propsGroup.add(startGroup);
-  }
-
-  // 나이트 네온 필러
-  if (map.night){
-    const neonColors = [0xff3ec8, 0x3ef0ff, 0xa35bff];
-    for (let i = 0; i < 16; i++){
-      const col = neonColors[i % neonColors.length];
-      const x = (i % 2 === 0 ? -1 : 1) * (map.pisteHalf + 5);
-      const z = -20 - i * (map.length / 16);
-      const y = terrainHeight(map, x, z);
-      const mat = new THREE.MeshStandardMaterial({ color: col, emissive: new THREE.Color(col), emissiveIntensity: 2.2, roughness: 0.4 });
-      const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 12, 8), mat);
-      pillar.position.set(x, y + 6, z);
-      propsGroup.add(pillar);
-      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: SPRITE, color: col, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false }));
-      glow.position.set(x, y + 12.5, z);
-      glow.scale.set(9, 9, 1);
-      propsGroup.add(glow);
-    }
-  }
-
-  // 별
-  if (map.night){
-    const starGeo = new THREE.BufferGeometry();
-    const sp = [];
-    const r2 = seedRng(1234);
-    for (let i = 0; i < 900; i++){
-      const th = r2() * Math.PI * 2, ph = Math.acos(r2() * 0.95);
-      const r = 1300;
-      sp.push(Math.sin(ph) * Math.cos(th) * r, Math.cos(ph) * r * 0.9 + 120, Math.sin(ph) * Math.sin(th) * r);
-    }
-    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
-    const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 3.2, sizeAttenuation: false, transparent: true, opacity: 0.85, depthWrite: false }));
-    stars.frustumCulled = false;
-    propsGroup.add(stars);
-  }
-}
-
-function disposeTree(root){
-  root.traverse(o => {
-    if (o.geometry) o.geometry.dispose();
-    if (o.material){
-      if (Array.isArray(o.material)) o.material.forEach(mm => { if (mm.map) mm.map.dispose(); mm.dispose(); });
-      else { if (o.material.map) o.material.map.dispose(); o.material.dispose(); }
-    }
-  });
-}
-
-/* --- 게이트 / 코스 오브젝트 --- */
-function buildCourse(map){
-  if (courseGroup){ world.remove(courseGroup); disposeTree(courseGroup); courseGroup = null; }
-  courseGroup = new THREE.Group();
-  world.add(courseGroup);
-  state.gates = [];
-  state.finishZ = -map.length;
-
-  const n = 16;
-  const startS = 74;
-  const endS = map.length - 46;
-  const spacing = (endS - startS) / (n - 1);
-  const poleGeo = new THREE.CylinderGeometry(0.085, 0.085, 2.7, 8);
-
-  for (let i = 0; i < n; i++){
-    const sDist = startS + i * spacing;
-    const z = -sDist;
-    let x = 0;
-    if (i > 0){
-      const amp = map.gateX * (1 - 0.28 * (i / n));
-      x = (i % 2 === 1 ? 1 : -1) * amp;
-    }
-    const y = terrainHeight(map, x, z);
-    const g = new THREE.Group();
-    g.position.set(x, y, z);
-
-    const width = 13;
-    const color = (i % 2 === 0) ? 0xff4d5e : 0x3f9dff;
-    const poleMat = new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.25, emissive: new THREE.Color(color), emissiveIntensity: 0.12 });
-    const left = new THREE.Mesh(poleGeo, poleMat); left.position.set(-width/2, 1.35, 0);
-    const right = new THREE.Mesh(poleGeo, poleMat); right.position.set(width/2, 1.35, 0);
-    left.castShadow = right.castShadow = true;
-    g.add(left, right);
-
-    // 폴에 붙은 게이트 플래그
-    const flagGeo = new THREE.PlaneGeometry(0.95, 0.7);
-    const flagMat = new THREE.MeshStandardMaterial({
-      color, roughness: 0.6, metalness: 0.0, side: THREE.DoubleSide, transparent: true, opacity: 1,
-      emissive: new THREE.Color(color), emissiveIntensity: map.night ? 0.55 : 0.08
-    });
-    for (const side of [-1, 1]){
-      const flag = new THREE.Mesh(flagGeo, flagMat);
-      flag.position.set(side * (width/2 - 0.5), 2.2, 0);
-      flag.castShadow = true;
-      g.add(flag);
-    }
-
-    // 게이트 상단 크로스바 + 번호 배너
-    const barMat = new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.25 });
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(width, 0.09, 0.09), barMat);
-    bar.position.set(0, 3.28, 0);
-    g.add(bar);
-
-    const bannerTex = makeBannerTexture(`GATE ${String(i+1).padStart(2,'0')}`, i % 2 === 0 ? '#e33548' : '#2b7fe0');
-    const bannerMat = new THREE.MeshBasicMaterial({ map: bannerTex, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthWrite: false });
-    const banner = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 0.42), bannerMat);
-    banner.position.set(0, 3.55, 0);
-    g.add(banner);
-
-    const panelMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(width, 0.5), panelMat);
-    panel.rotation.x = -Math.PI / 2;
-    panel.position.set(0, 0.06, 0);
-    g.add(panel);
-
-    courseGroup.add(g);
-    state.gates.push({
-      index: i, x, z, halfW: width / 2, group: g,
-      passed: false, poleMat, bannerMat, panelMat, flagMat
-    });
-  }
-
-  // FINISH
-  const finTex = makeBannerTexture('FINISH', '#111111');
-  const finBanner = new THREE.Mesh(
-    new THREE.PlaneGeometry(40, 2.4),
-    new THREE.MeshBasicMaterial({ map: finTex, transparent: true, side: THREE.DoubleSide })
-  );
-  const fy = terrainHeight(map, 0, -map.length);
-  finBanner.position.set(0, fy + 4.6, -map.length);
-  courseGroup.add(finBanner);
-  for (const side of [-1, 1]){
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,4.8,8),
-      new THREE.MeshStandardMaterial({ color: 0xf5f7fa, roughness: 0.5 }));
-    post.position.set(side * 20, fy + 2.4, -map.length);
-    courseGroup.add(post);
-  }
-}
-
-/* --- 파크 피처 --- */
-function makeKickerGeometry(w, l, h){
-  const hw = w/2;
-  const v = [
-    -hw,0,0,   hw,0,0,   hw,0,-l,  -hw,0,-l,      // 0..3 base
-    -hw,h,-l,  hw,h,-l                             // 4..5 lip
-  ];
-  const pos = [];
-  const push = (...a) => pos.push(...a);
-  // 바닥
-  push(v[0],v[1],v[2], v[3],v[4],v[5], v[6],v[7],v[8]);
-  push(v[0],v[1],v[2], v[6],v[7],v[8], v[9],v[10],v[11]);
-  // 램프면 (앞에서 뒤로 상승)
-  push(v[0],v[1],v[2], v[3],v[4],v[5], v[15],v[16],v[17]);
-  push(v[0],v[1],v[2], v[15],v[16],v[17], v[12],v[13],v[14]);
-  // 뒷면
-  push(v[6],v[7],v[8], v[9],v[10],v[11], v[15],v[16],v[17]);
-  push(v[6],v[7],v[8], v[15],v[16],v[17], v[12],v[13],v[14]);
-  // 좌측
-  push(v[0],v[1],v[2], v[12],v[13],v[14], v[9],v[10],v[11]);
-  // 우측
-  push(v[3],v[4],v[5], v[6],v[7],v[8], v[15],v[16],v[17]);
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.computeVertexNormals();
-  return geo;
-}
-
-function buildPark(map){
-  if (parkGroup){ world.remove(parkGroup); disposeTree(parkGroup); parkGroup = null; }
-  parkGroup = new THREE.Group();
-  world.add(parkGroup);
-  state.park = { kickers: [], rails: [] };
-
-  const kickerMat = new THREE.MeshStandardMaterial({ color: map.night ? 0x3a2f66 : 0xdae7f5, roughness: 0.75, metalness: 0.05, flatShading: true });
-  const lipMat = new THREE.MeshStandardMaterial({ color: map.night ? 0xff3ec8 : 0x3f9dff, emissive: new THREE.Color(map.night ? 0xff3ec8 : 0x3f9dff), emissiveIntensity: map.night ? 1.4 : 0.2, roughness: 0.4 });
-
-  const defs = [
-    { x: 0,   s: 46,  w: 16, l: 10, h: 3.4 },
-    { x: -14, s: 108, w: 14, l: 9,  h: 3.2 },
-    { x: 15,  s: 168, w: 18, l: 12, h: 4.2 },
-    { x: -6,  s: 236, w: 16, l: 10, h: 3.6 },
-    { x: 12,  s: 306, w: 20, l: 13, h: 4.6 },
-    { x: -16, s: 384, w: 15, l: 10, h: 3.5 },
-    { x: 4,   s: 462, w: 22, l: 14, h: 5.0 }
-  ];
-  for (const d of defs){
-    const z = -d.s;
-    const y = terrainHeight(map, d.x, z);
-    const grp = new THREE.Group();
-    grp.position.set(d.x, y, z);
-    // 지형 경사에 맞춰 회전
-    grp.rotation.x = Math.atan(map.slope) * 0.92;
-    const wedge = new THREE.Mesh(makeKickerGeometry(d.w, d.l, d.h), kickerMat);
-    wedge.castShadow = true; wedge.receiveShadow = true;
-    grp.add(wedge);
-    const lip = new THREE.Mesh(new THREE.BoxGeometry(d.w, 0.18, 0.5), lipMat);
-    lip.position.set(0, d.h, -d.l);
-    grp.add(lip);
-    parkGroup.add(grp);
-    state.park.kickers.push({ x: d.x, zStart: z, zLip: z - d.l, w: d.w, l: d.l, h: d.h, y, grp });
-  }
-
-  const railMat = new THREE.MeshStandardMaterial({
-    color: map.night ? 0x9fb6ff : 0xe4edf7, roughness: 0.42, metalness: 0.35,
-    emissive: new THREE.Color(map.night ? 0x3ef0ff : 0x7fd8ff), emissiveIntensity: map.night ? 0.55 : 0.18
-  });
-  const railDefs = [
-    { x: 12, s: 78, len: 16, h: 1.5 },
-    { x: -10, s: 200, len: 20, h: 1.7 },
-    { x: 8, s: 344, len: 18, h: 1.6 },
-    { x: -12, s: 500, len: 22, h: 1.8 }
-  ];
-  for (const d of railDefs){
-    const z = -d.s;
-    const y = terrainHeight(map, d.x, z);
-    const grp = new THREE.Group();
-    grp.position.set(d.x, y, z);
-    grp.rotation.x = Math.atan(map.slope) * 0.98;   // 슬로프에 나란히
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.26, d.len), railMat);
-    bar.position.y = d.h;
-    bar.castShadow = true;
-    grp.add(bar);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.05, d.len),
-      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.5,
-        emissive: new THREE.Color(map.night ? 0x3ef0ff : 0x6fd8ff), emissiveIntensity: map.night ? 0.9 : 0.25 }));
-    cap.position.y = d.h + 0.145;
-    grp.add(cap);
-    for (const off of [-d.len/2 + 1.0, 0, d.len/2 - 1.0]){
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,d.h + 0.1,6), railMat);
-      leg.position.set(0, d.h/2 - 0.05, off);
-      grp.add(leg);
-    }
-    parkGroup.add(grp);
-    state.park.rails.push({ x: d.x, z, len: d.len, h: d.h, y });
-  }
-}
-
-/* ---------------------------------------------------------------- 3 스키어 */
-let skierGroup = null, skierTilt = null, skierMats = null;
-let ghostGroup = null;
-
-function buildSkier(skin, ghost = false){
-  const g = new THREE.Group();
-  const tilt = new THREE.Group();
-  g.add(tilt);
-  g.scale.setScalar(1.3);
-
-  const mkMat = (opts) => new THREE.MeshStandardMaterial({
-    roughness: 0.45, metalness: 0.18, ...opts
-  });
-
-  const suitMat = mkMat({
-    color: skin.suit,
-    emissive: new THREE.Color(skin.glow || 0x000000),
-    emissiveIntensity: skin.glow ? 0.75 : 0
-  });
-  const accentMat = mkMat({
-    color: skin.accent,
-    emissive: new THREE.Color(skin.glow ? skin.accent : 0x000000),
-    emissiveIntensity: skin.glow ? 0.5 : 0
-  });
-  const pantsMat = mkMat({ color: skin.pants, roughness: 0.6 });
-  const helmetMat = mkMat({ color: skin.helmet, roughness: 0.3, metalness: 0.45 });
-  const skiMat = mkMat({ color: skin.accent, roughness: 0.35, metalness: 0.35 });
-  const darkMat = mkMat({ color: 0x0b1119, roughness: 0.7 });
-
-  // 스키
-  const skiGeo = new THREE.BoxGeometry(0.13, 0.045, 1.8);
-  for (const side of [-1, 1]){
-    const ski = new THREE.Mesh(skiGeo, skiMat);
-    ski.position.set(side * 0.18, 0.03, -0.05);
-    ski.castShadow = true;
-    tilt.add(ski);
-    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.05, 0.34), skiMat);
-    tip.position.set(side * 0.18, 0.09, -0.98);
-    tip.rotation.x = -0.32;
-    tilt.add(tip);
-  }
-  // 부츠
-  const bootGeo = new THREE.BoxGeometry(0.17, 0.24, 0.34);
-  for (const side of [-1, 1]){
-    const boot = new THREE.Mesh(bootGeo, darkMat);
-    boot.position.set(side * 0.18, 0.16, -0.02);
-    tilt.add(boot);
-  }
-  // 다리
-  const legGeo = new THREE.CapsuleGeometry(0.085, 0.42, 6, 10);
-  for (const side of [-1, 1]){
-    const leg = new THREE.Mesh(legGeo, pantsMat);
-    leg.position.set(side * 0.14, 0.52, 0.02);
-    leg.rotation.x = 0.16;
-    leg.castShadow = true;
-    tilt.add(leg);
-  }
-  // 몸통
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.19, 0.36, 8, 12), suitMat);
-  torso.position.set(0, 1.02, 0.03);
-  torso.rotation.x = 0.20;
-  torso.castShadow = true;
-  tilt.add(torso);
-  // 가슴 스트라이프
-  const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.09, 0.02), accentMat);
-  stripe.position.set(0, 1.06, -0.16);
-  stripe.rotation.x = 0.20;
-  tilt.add(stripe);
-  // 팔
-  const armGeo = new THREE.CapsuleGeometry(0.06, 0.30, 6, 8);
-  for (const side of [-1, 1]){
-    const arm = new THREE.Mesh(armGeo, suitMat);
-    arm.position.set(side * 0.24, 1.02, 0.02);
-    arm.rotation.z = side * 0.22;
-    arm.rotation.x = -0.35;
-    arm.castShadow = true;
-    tilt.add(arm);
-  }
-  // 헬멧
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.155, 18, 14), helmetMat);
-  head.position.set(0, 1.42, 0.04);
-  head.castShadow = true;
-  tilt.add(head);
-  // 고글
-  const goggles = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.10, 0.08), darkMat);
-  goggles.position.set(0, 1.44, -0.10);
-  tilt.add(goggles);
-  const lens = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.07, 0.02),
-    new THREE.MeshStandardMaterial({ color: skin.glow ? skin.glow : 0x44d9ff, emissive: new THREE.Color(skin.glow ? skin.glow : 0x2ea8c9), emissiveIntensity: 0.8, roughness: 0.15, metalness: 0.6 }));
-  lens.position.set(0, 1.44, -0.145);
-  tilt.add(lens);
-  // 폴
-  const poleGeo = new THREE.CylinderGeometry(0.018, 0.018, 1.15, 6);
-  for (const side of [-1, 1]){
-    const pole = new THREE.Mesh(poleGeo, new THREE.MeshStandardMaterial({ color: 0x9aa7b4, roughness: 0.4, metalness: 0.8 }));
-    pole.position.set(side * 0.30, 0.60, 0.28);
-    pole.rotation.x = 0.42;
-    pole.rotation.z = side * 0.12;
-    tilt.add(pole);
-  }
-
-  if (ghost){
-    const gm = new THREE.MeshStandardMaterial({
-      color: 0x9be9ff, emissive: new THREE.Color(0x39c9ff), emissiveIntensity: 0.85,
-      transparent: true, opacity: 0.34, depthWrite: false, roughness: 0.3, metalness: 0
-    });
-    g.traverse(o => { if (o.isMesh) o.material = gm; });
-    g.traverse(o => { o.castShadow = false; o.receiveShadow = false; });
-  } else {
-    g.traverse(o => { if (o.isMesh) { o.castShadow = true; } });
-  }
-
-  return { group: g, tilt, mats: { suitMat, accentMat, pantsMat, helmetMat, skiMat, darkMat } };
-}
-
-function applySkinVisual(){
-  const skin = skinById(state.skinId);
-  if (skierGroup){ world.remove(skierGroup); disposeTree(skierGroup); }
-  const built = buildSkier(skin, false);
-  skierGroup = built.group;
-  skierTilt = built.tilt;
-  skierMats = built.mats;
-  world.add(skierGroup);
-  skierGroup.position.set(skier.x, skier.y, skier.z);
-  // 트레일/스프레이 색 반영
-  trailL.setColor(skin.trail, !!skin.glow);
-  trailR.setColor(skin.trail, !!skin.glow);
-  spray.setTint(skin.glow ? skin.trail : 0xffffff);
-}
-
-/* --- 스키 자국 (리본) --- */
-class Trail {
-  constructor(maxPts = 420, width = 0.16){
-    this.max = maxPts; this.width = width; this.count = 0;
-    const geo = new THREE.BufferGeometry();
-    this.pos = new Float32Array(maxPts * 2 * 3);
-    this.col = new Float32Array(maxPts * 2 * 3);
-    this.uv = new Float32Array(maxPts * 2 * 2);
-    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3));
-    geo.setAttribute('uv', new THREE.BufferAttribute(this.uv, 2));
-    const idx = [];
-    for (let i = 0; i < maxPts - 1; i++){
-      const a = i*2, b = a+1, c = a+2, d = a+3;
-      idx.push(a, b, c, b, d, c);
-    }
-    geo.setIndex(idx);
-    geo.setDrawRange(0, 0);
-    this.geo = geo;
-    this.mat = new THREE.MeshBasicMaterial({
-      vertexColors: true, transparent: true, opacity: 0.6,
-      depthWrite: false, side: THREE.DoubleSide, blending: THREE.NormalBlending
-    });
-    this.mesh = new THREE.Mesh(geo, this.mat);
-    this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 2;
-    this.baseColor = new THREE.Color(0x9fb6c9);
-    this.glow = false;
-  }
-  setColor(hex, glow){
-    this.baseColor.setHex(hex);
-    this.glow = !!glow;
-    this.mat.opacity = glow ? 0.9 : 0.6;
-    this.mat.blending = THREE.NormalBlending;
-    this.mat.needsUpdate = true;
-  }
-  clear(){
-    this.count = 0; this.geo.setDrawRange(0, 0);
-  }
-  push(lx, ly, lz, rx, ry, rz){
-    if (this.count >= this.max){
-      this.pos.copyWithin(0, 6);
-      this.col.copyWithin(0, 6);
-      this.uv.copyWithin(0, 4);
-      this.count = this.max - 2;
-    }
-    const i = this.count;
-    this.pos[i*6+0] = lx; this.pos[i*6+1] = ly; this.pos[i*6+2] = lz;
-    this.pos[i*6+3] = rx; this.pos[i*6+4] = ry; this.pos[i*6+5] = rz;
-    const c = this.baseColor;
-    for (let k = 0; k < 2; k++){
-      const o = i*6 + k*3;
-      this.col[o] = c.r; this.col[o+1] = c.g; this.col[o+2] = c.b;
-    }
-    const u = i*4;
-    this.uv[u] = 0; this.uv[u+1] = i; this.uv[u+2] = 1; this.uv[u+3] = i;
-    this.count += 2;
-    this.geo.attributes.position.needsUpdate = true;
-    this.geo.attributes.color.needsUpdate = true;
-    this.geo.setDrawRange(0, Math.max(0, (this.count/2 - 1) * 6));
-  }
-}
-const trailL = new Trail(420, 0.14);
-const trailR = new Trail(420, 0.14);
-
-/* --- 스노우 스프레이 파티클 --- */
-class Spray {
-  constructor(max = 700){
-    this.max = max; this.head = 0;
-    this.pos = new Float32Array(max * 3);
-    this.col = new Float32Array(max * 3);
-    this.vel = new Float32Array(max * 3);
-    this.life = new Float32Array(max);
-    this.maxLife = new Float32Array(max);
-    for (let i = 0; i < max; i++) this.pos[i*3+1] = -9999;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3));
-    this.geo = geo;
-    this.mat = new THREE.PointsMaterial({
-      size: 0.52, map: SPRITE, vertexColors: true, transparent: true,
-      opacity: 0.9, depthWrite: false, sizeAttenuation: true, alphaTest: 0.02
-    });
-    this.points = new THREE.Points(geo, this.mat);
-    this.points.frustumCulled = false;
-    this.tint = new THREE.Color(0xffffff);
-  }
-  setTint(hex){ this.tint.setHex(hex); }
-  spawn(x, y, z, vx, vy, vz, life = 0.8, scale = 1){
-    const i = this.head; this.head = (this.head + 1) % this.max;
-    this.pos[i*3] = x; this.pos[i*3+1] = y; this.pos[i*3+2] = z;
-    this.vel[i*3] = vx; this.vel[i*3+1] = vy; this.vel[i*3+2] = vz;
-    this.life[i] = life; this.maxLife[i] = life;
-    const t = this.tint;
-    this.col[i*3] = t.r; this.col[i*3+1] = t.g; this.col[i*3+2] = t.b;
-  }
-  update(dt){
-    for (let i = 0; i < this.max; i++){
-      if (this.life[i] <= 0) continue;
-      this.life[i] -= dt;
-      if (this.life[i] <= 0){ this.pos[i*3+1] = -9999; continue; }
-      this.vel[i*3+1] -= 9.2 * dt;
-      this.vel[i*3] *= (1 - 1.6 * dt);
-      this.vel[i*3+2] *= (1 - 1.6 * dt);
-      this.pos[i*3] += this.vel[i*3] * dt;
-      this.pos[i*3+1] += this.vel[i*3+1] * dt;
-      this.pos[i*3+2] += this.vel[i*3+2] * dt;
-      const f = this.life[i] / this.maxLife[i];
-      this.col[i*3] = this.tint.r * f;
-      this.col[i*3+1] = this.tint.g * f;
-      this.col[i*3+2] = this.tint.b * f;
-    }
-    this.geo.attributes.position.needsUpdate = true;
-    this.geo.attributes.color.needsUpdate = true;
-  }
-}
-const spray = new Spray(700);
-world.add(trailL.mesh, trailR.mesh, spray.points);
-
-/* ---------------------------------------------------------------- 4 월드 로드 */
-let currentMap = MAPS[0];
-
-function loadWorld(mapId){
-  const map = mapById(mapId);
-  currentMap = map;
-  state.mapId = map.id;
-
-  scene.fog = new THREE.Fog(map.fog.color, map.fog.near, map.fog.far);
-  renderer.setClearColor(map.fog.color, 1);
-
-  hemiLight.color.setHex(map.hemi.sky);
-  hemiLight.groundColor.setHex(map.hemi.ground);
-  hemiLight.intensity = map.hemi.intensity;
-
-  sunLight.color.setHex(map.sun.color);
-  sunLight.intensity = map.sun.intensity;
-  sunLight.castShadow = !map.night;
-  if (map.night){ sunLight.shadow.mapSize.set(512, 512); }
-
-  buildSky(map);
-  buildTerrain(map);
-  buildProps(map);
-  buildCourse(map);
-  buildPark(map);
-
-  // 문서 테마 색
-  const accent = map.night ? '#ff6ad5' : (map.id === 'glacier' ? '#7fd8ff' : '#5ef0d8');
-  document.documentElement.style.setProperty('--accent', accent);
-
-  trailL.clear(); trailR.clear();
-
-  document.querySelectorAll('#titleMapList .chip').forEach(el => {
-    el.classList.toggle('sel', el.dataset.id === map.id);
-  });
-  updateVisibility();
-}
-
-function updateVisibility(){
-  if (courseGroup) courseGroup.visible = state.mode === 'race';
-  if (parkGroup) parkGroup.visible = state.mode === 'park';
-}
-
-/* ---------------------------------------------------------------- 5 게임 흐름 */
-const CAM = { back: 6.4, height: 2.85 };
-
-function resetSkier(){
-  skier.x = 0; skier.z = 0; skier.prevX = 0; skier.prevZ = 0;
-  skier.heading = 0; skier.speed = 0; skier.vy = 0;
-  skier.airborne = false; skier.airTime = 0; skier.spin = 0;
-  skier.lean = 0; skier.leanVisual = 0; skier.crouch = 0;
-  skier.gliding = false; skier.grinding = false; skier.grindTime = 0; skier.grindFeature = null;
-  skier.y = terrainHeight(currentMap, 0, 0);
-  skier.dist = 0;
-  if (skierGroup) skierGroup.position.set(skier.x, skier.y, skier.z);
-  trailL.clear(); trailR.clear();
-}
-
-function startRun(mode){
-  state.mode = mode;
-  state.paused = false;
-  state.time = 0;
-  state.gatesPassed = 0;
-  state.bestTrick = 0;
-  state.trickCount = 0;
-  state.sessionScore = 0;
-  state.trickLog = [];
-  state.ghostIndex = 0;
-  state.medal = null;
-  state.lastResult = null;
-  state.record = [];
-  state.recordT = 0;
-
-  state.gates.forEach(g => {
-    g.passed = false;
-    g.poleMat.color.setHex(g.index % 2 === 0 ? 0xff4d5e : 0x3f9dff);
-    g.poleMat.emissiveIntensity = 0.12;
-    g.bannerMat.opacity = 0.95;
-    g.panelMat.opacity = 0.18;
-    if (g.flagMat) g.flagMat.opacity = 1;
-  });
-  state.ghostFrames = [];
-  const g = leaderboard.getGhost(currentMap.id);
-  if (g && Array.isArray(g) && g.length > 2) state.ghostFrames = g;
-  buildGhost();
-  resetSkier();
-  updateVisibility();
-
-  hideAllScreens();
-  $('hud').classList.remove('hidden');
-  $('trickFeed').innerHTML = '';
-  state.phase = 'countdown';
-  state.countdown = 3.2;
-  updateCountdownUI(3);
-  $('countdown').classList.remove('hidden');
-  updateHud(true);
-}
-
-function buildGhost(){
-  if (ghostGroup){ world.remove(ghostGroup); disposeTree(ghostGroup); ghostGroup = null; }
-  if (!state.ghostFrames.length) return;
-  const built = buildSkier(skinById(state.skinId), true);
-  ghostGroup = built.group;
-  ghostGroup.visible = false;
-  world.add(ghostGroup);
-}
-
-function finishRun(){
-  state.phase = 'finish';
-  const t = state.time;
-  const gates = state.gatesPassed;
-  const medal = gates === 16
-    ? (t <= currentMap.medal.gold ? 'gold' : t <= currentMap.medal.silver ? 'silver' : t <= currentMap.medal.bronze ? 'bronze' : null)
-    : null;
-  state.medal = medal;
-
-  const res = leaderboard.submit({ mapId: currentMap.id, mode:'race', time:t, gates });
-  state.lastResult = { time:t, gates, medal, isNewBest: res.isNewBest };
-
-  if (gates === 16 && res.isNewBest && state.record.length > 2){
-    leaderboard.saveGhost(currentMap.id, state.record);
-    state.ghostFrames = state.record.slice();
-  }
-
-  $('resTime').textContent = fmtTime(t);
-  const medalEl = $('resMedal');
-  medalEl.className = 'res-medal ' + (medal || 'none');
-  medalEl.textContent = medal ? medal.toUpperCase() : (gates < 16 ? '게이트 미통과' : 'NO MEDAL');
-  $('resGates').textContent = `${gates} / 16`;
-  $('resBest').textContent = res.best ? fmtTime(res.best.time) : '--:--.---';
-  $('resNew').classList.toggle('hidden', !(res.isNewBest && gates === 16));
-  $('resGhostInfo').textContent = state.ghostFrames.length ? '저장됨 · 다음 주행에 표시' : '없음';
-  showScreen('screenResult');
-  $('hud').classList.add('hidden');
-  updateTitleChips();
-}
-
-function trickScore(spinDeg, airTime, clean){
-  const base = clamp(spinDeg / 720, 0, 1) * 55;
-  const air = clamp(airTime / 1.5, 0, 1) * 25;
-  const land = clean ? 20 : 6;
-  return Math.round(clamp(base + air + land, 0, 100));
-}
-function trickName(spinDeg){
-  const turns = spinDeg / 360;
-  if (spinDeg < 120) return 'AIR';
-  if (Math.abs(turns - 1) < 0.2) return '360 SPIN';
-  if (Math.abs(turns - 2) < 0.25) return '720 SPIN';
-  if (Math.abs(turns - 3) < 0.3) return '1080 SPIN';
-  return Math.round(spinDeg) + '° SPIN';
-}
-
-function land(){
-  const groundY = terrainHeight(currentMap, skier.x, skier.z);
-  const wasAir = skier.airborne;
-  const airTime = skier.airTime;
-  const spinDeg = Math.abs(skier.spin) * 180 / Math.PI;
-  skier.airborne = false;
-  skier.y = groundY;
-  skier.vy = 0;
-  skier.airTime = 0;
-
-  if (wasAir && airTime > 0.28){
-    const turns = spinDeg / 360;
-    const clean = Math.abs(turns - Math.round(turns)) < 0.28;
-    const score = trickScore(spinDeg, airTime, clean);
-    // 착지 스프레이
-    for (let i = 0; i < 26; i++){
-      const a = Math.random() * Math.PI * 2;
-      spray.spawn(skier.x + Math.cos(a)*0.6, groundY + 0.2, skier.z + Math.sin(a)*0.6,
-        Math.cos(a) * (1.5 + Math.random()*3), 1.2 + Math.random()*2.4, Math.sin(a) * (1.5 + Math.random()*3),
-        0.55 + Math.random()*0.5);
-    }
-    state.trickCount++;
-    state.sessionScore += score;
-    if (score > state.bestTrick) state.bestTrick = score;
-    state.trickLog.push({ t:+state.time.toFixed(2), air:+airTime.toFixed(2), spin:Math.round(spinDeg), score, clean, x:+skier.x.toFixed(1), z:+skier.z.toFixed(1) });
-    const nm = trickName(spinDeg) + (clean ? '' : ' · 불안정');
-    pushTrickRow(`${nm}`, score);
-    showTrickPop(spinDeg >= 120 ? trickName(spinDeg) : 'AIR', score, clean);
-    if (!clean) skier.speed *= 0.82;
-  }
-  skier.spin = 0;
-}
-
-function pushTrickRow(label, score){
-  const feed = $('trickFeed');
-  const row = document.createElement('div');
-  row.className = 'trick-row';
-  row.innerHTML = `${label}<span class="pts">${score}점</span>`;
-  feed.appendChild(row);
-  while (feed.children.length > 4) feed.removeChild(feed.firstChild);
-  setTimeout(() => { row.style.opacity = '0.35'; }, 2600);
-}
-
-let popTimer = null;
-function showTrickPop(label, score, clean){
-  const el = $('trickPop');
-  el.innerHTML = `${label}<span class="sub">${score} POINTS${clean ? '' : ' · SLOPPY'}</span>`;
-  el.classList.remove('show');
-  void el.offsetWidth;
-  el.classList.add('show');
-  clearTimeout(popTimer);
-  popTimer = setTimeout(() => el.classList.remove('show'), 1300);
-}
-
-/* --- 물리 --- */
-function stepPhysics(dt){
-  const map = currentMap;
-  const slopeAngle = Math.atan(map.slope);
-  skier.prevX = skier.x;
-  skier.prevZ = skier.z;
-  const leanTarget = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-  skier.lean = damp(skier.lean, leanTarget, 9, dt);
-
-  // 점프 입력
-  if (input.jumpQueued){
-    input.jumpQueued = false;
-    if (!skier.airborne){
-      skier.airborne = true;
-      skier.vy = 6.4 + Math.min(skier.speed * 0.06, 2.2);
-      skier.airTime = 0;
-      skier.spin = 0;
-    }
-  }
-
-  if (skier.airborne){
-    skier.airTime += dt;
-    skier.spin += skier.lean * 7.4 * dt;
-    skier.spin = clamp(skier.spin, -Math.PI * 4.4, Math.PI * 4.4);
-    skier.heading += skier.lean * 0.42 * dt;
-    skier.vy -= P.airGravity * dt;
-    skier.y += skier.vy * dt;
-    // 공중에서도 전진
-    skier.speed *= (1 - 0.018 * dt);
-    skier.x += Math.sin(skier.heading) * skier.speed * dt;
-    skier.z -= Math.cos(skier.heading) * skier.speed * dt;
-    const groundY = terrainHeight(map, skier.x, skier.z);
-    if (skier.y <= groundY){
-      skier.y = groundY;
-      land();
-    }
-  } else {
-    const speedFactor = clamp(skier.speed / 15, 0, 1);
-    const turnRate = P.turnLow + P.turn * speedFactor;
-    const grip = 1 - 0.30 * clamp(skier.speed / P.maxSpeed, 0, 1);
-    skier.heading += skier.lean * turnRate * grip * dt;
-    skier.speed *= (1 - P.carveLoss * Math.abs(skier.lean) * dt);
-
-    const gravityAlong = P.gravity * Math.sin(slopeAngle) * Math.cos(skier.heading);
-    const dragK = input.up ? P.dragTuck : P.dragNormal;
-    const drag = dragK * skier.speed * skier.speed;
-    let acc = gravityAlong - drag - P.rollFric;
-    if (input.down) acc -= P.brake;
-    skier.speed = clamp(skier.speed + acc * dt, 0, P.maxSpeed);
-
-    // 턱 자세
-    skier.crouch = damp(skier.crouch, input.up ? 1 : 0, 8, dt);
-
-    // 이동
-    const dx = Math.sin(skier.heading) * skier.speed * dt;
-    const dz = -Math.cos(skier.heading) * skier.speed * dt;
-    skier.x += dx; skier.z += dz;
-    skier.dist += Math.hypot(dx, dz);
-
-    // 코스 이탈 방지
-    const limit = map.pisteHalf + 26;
-    if (Math.abs(skier.x) > limit){
-      skier.x = Math.sign(skier.x) * limit;
-      skier.speed *= 0.9;
-      skier.heading *= 0.6;
-      toast('코스 아웃 · 파이스트로 복귀');
-    }
-
-    // 레일 그라인드
-    const rail = (state.mode === 'park' && state.park) ? findRail() : null;
-    if (rail){
-      if (!skier.grinding){
-        skier.grinding = true;
-        skier.grindTime = 0;
-        skier.grindFeature = rail;
-      }
-      skier.y = terrainHeight(currentMap, rail.x, skier.z) + rail.h + 0.05;
-      skier.grindTime += dt;
-      skier.heading = damp(skier.heading, 0, 12, dt);
-      skier.speed = Math.min(skier.speed + 3.5 * dt, P.maxSpeed);
-      if (Math.random() < 0.7){
-        spray.spawn(skier.x + (Math.random()-0.5)*0.4, skier.y + 0.12, skier.z + (Math.random()-0.5)*0.6,
-          (Math.random()-0.5)*2.4, 1.2 + Math.random()*1.6, 1 + Math.random()*2.5, 0.35 + Math.random()*0.3);
-      }
-    } else if (skier.grinding){
-      const t = skier.grindTime;
-      skier.grinding = false;
-      skier.grindFeature = null;
-      const gain = Math.round(clamp(t * 26, 5, 40));
-      state.sessionScore += gain;
-      state.trickCount++;
-      if (gain > state.bestTrick) state.bestTrick = gain;
-      pushTrickRow(`RAIL ${t.toFixed(1)}s`, gain);
-      showTrickPop('RAIL GRIND', gain, true);
-      skier.speed += 1.2;
-      skier.vy = 3.2; skier.airborne = true; skier.airTime = 0; skier.spin = 0;
-      skier.grindTime = 0;
-    }
-
-    if (!skier.grinding){
-      // 지면 높이 (킥커 위면 램프면)
-      let groundY = terrainHeight(map, skier.x, skier.z);
-      const kick = (state.mode === 'park' && state.park) ? kickerSurface() : null;
-      if (kick) groundY = kick.y;
-
-      // 킥커 립 통과 → 발사
-      if (kick && kick.launch && skier.speed > 7){
-        skier.airborne = true;
-        skier.vy = skier.speed * Math.sin(kick.angle) * 1.15 + 2.0;
-        skier.airTime = 0;
-        skier.spin = 0;
-        skier.y = groundY + 0.1;
-      } else {
-        skier.y = damp(skier.y, groundY, 22, dt);
-      }
-    }
-  }
-}
-
-function kickerSurface(){
-  const map = currentMap;
-  for (const k of state.park.kickers){
-    const z0 = k.zStart, z1 = k.zLip;
-    if (skier.z > z0 || skier.z < z1) continue;
-    if (Math.abs(skier.x - k.x) > k.w/2) continue;
-    const prog = (z0 - skier.z) / k.l;
-    const h = prog * k.h;
-    const base = terrainHeight(map, skier.x, skier.z);
-    return { y: base + h, launch: (skier.z - z1) < 1.4, angle: Math.atan2(k.h, k.l) };
-  }
-  return null;
-}
-
-function findRail(){
-  for (const r of state.park.rails){
-    if (Math.abs(skier.x - r.x) > 1.0) continue;
-    const z0 = r.z + r.len/2, z1 = r.z - r.len/2;
-    if (skier.z > z0 || skier.z < z1) continue;
-    const railTop = terrainHeight(currentMap, r.x, skier.z) + r.h;
-    if (skier.y < railTop + 2.6 && skier.y > railTop - 3.5){
-      if (!skier.grinding && skier.speed > 6) return r;
-      if (skier.grinding) return r;
-    }
-  }
-  return null;
-}
-
-function checkGates(){
-  if (state.mode !== 'race') return;
-  for (const g of state.gates){
-    if (g.passed) continue;
-    if (skier.prevZ > g.z && skier.z <= g.z){
-      const hit = Math.abs(skier.x - g.x) <= g.halfW;
-      if (hit){
-        g.passed = true;
-        state.gatesPassed++;
-        g.poleMat.color.setHex(0x3ef0a8);
-        g.poleMat.emissiveIntensity = 0.9;
-        g.bannerMat.opacity = 0.0;
-        if (g.flagMat) g.flagMat.opacity = 0.18;
-        g.panelMat.color.setHex(0x3ef0a8);
-        g.panelMat.opacity = 0.42;
-        for (let i = 0; i < 10; i++){
-          spray.spawn(g.x + (Math.random()-0.5)*g.halfW*1.4, g.z*0 + terrainHeight(currentMap, g.x, g.z) + 1.2, g.z + (Math.random()-0.5)*1.2,
-            (Math.random()-0.5)*3, 1 + Math.random()*2.4, (Math.random()-0.5)*3, 0.45);
-        }
-      } else if (skier.z <= g.z){
-        g.passed = true; // 지나감 (미통과)
-        g.poleMat.color.setHex(0x5a2530);
-        g.poleMat.emissiveIntensity = 0.05;
-        g.bannerMat.opacity = 0.1;
-        if (g.flagMat) g.flagMat.opacity = 0.25;
-        g.panelMat.opacity = 0.06;
-        toast(`게이트 ${g.index+1} 미통과`, 1400);
-      }
-    }
-  }
-  if (skier.prevZ > state.finishZ && skier.z <= state.finishZ){
-    if (state.phase === 'play') finishRun();
-  }
-}
-
-/* --- 고스트 재생 --- */
-function updateGhost(dt){
-  if (!ghostGroup || !state.ghostFrames.length) return;
-  if (state.mode !== 'race' || !state.ghostEnabled){ ghostGroup.visible = false; return; }
-  ghostGroup.visible = true;
-  const fr = state.ghostFrames;
-  const t = state.time;
-  let i = state.ghostIndex;
-  while (i < fr.length - 2 && fr[i+1].t <= t) i++;
-  state.ghostIndex = i;
-  const a = fr[i], b = fr[Math.min(i+1, fr.length-1)];
-  const k = b.t > a.t ? clamp((t - a.t) / (b.t - a.t), 0, 1) : 0;
-  ghostGroup.position.set(lerp(a.x,b.x,k), lerp(a.y,b.y,k) + 0.02, lerp(a.z,b.z,k));
-  ghostGroup.rotation.y = -lerp(a.h, b.h, k);
-  if (ghostGroup.children[0]) ghostGroup.children[0].rotation.z = -lerp(a.l || 0, b.l || 0, k) * 0.45;
-}
-
-/* --- 카메라 --- */
-function updateCamera(dt, tNow){
-  if (state.phase === 'title'){
-    const r = 12.0 + Math.sin(tNow * 0.25) * 1.0;
-    const a = 0.52 + Math.sin(tNow * 0.16) * 0.42;
-    const tx = Math.sin(a) * r, tz = Math.cos(a) * r;
-    const ty = skier.y + 4.1;
-    camera.position.lerp(new THREE.Vector3(tx, ty, tz), 1 - Math.exp(-dt * 2.2));
-    camLook.lerp(new THREE.Vector3(0, skier.y + 1.2, -7), 1 - Math.exp(-dt * 3));
-    camera.lookAt(camLook);
-    camera.fov = damp(camera.fov, 55, 2, dt);
-    camera.updateProjectionMatrix();
-    return;
-  }
-  if (state.phase === 'finish'){
-    const dirXf = Math.sin(skier.heading), dirZf = -Math.cos(skier.heading);
-    const target = new THREE.Vector3(skier.x - dirXf * 13, skier.y + 6.5, skier.z - dirZf * 13);
-    camera.position.lerp(target, 1 - Math.exp(-dt * 1.6));
-    camLook.lerp(new THREE.Vector3(skier.x, skier.y + 1.4, skier.z - 4), 1 - Math.exp(-dt * 2.4));
-    camera.lookAt(camLook);
-    camera.fov = damp(camera.fov, 55, 1.6, dt);
-    camera.updateProjectionMatrix();
-    return;
-  }
-  const dirX = Math.sin(skier.heading), dirZ = -Math.cos(skier.heading);
-  const airBoost = skier.airborne ? 2.4 + Math.min(skier.airTime, 1.2) * 1.2 : 0;
-  const back = (CAM.back + skier.speed * 0.075 + (skier.airborne ? 1.2 : 0)) * (camera.aspect < 1 ? 1.38 : 1);
-  const height = CAM.height + Math.min(skier.speed, 40) * 0.022 + airBoost;
-  const ahead = skier.airborne ? 9.5 : 17;
-  const target = new THREE.Vector3(skier.x - dirX * back, skier.y + height, skier.z - dirZ * back);
-  const look = new THREE.Vector3(skier.x + dirX * ahead, skier.y + (skier.airborne ? 0.9 : 1.3), skier.z + dirZ * ahead);
-  camera.position.lerp(target, 1 - Math.exp(-dt * 6.2));
-  camLook.lerp(look, 1 - Math.exp(-dt * 8));
-  camera.lookAt(camLook);
-  const narrow = clamp((1 - camera.aspect) * 26, 0, 26);
-  const fovTarget = 60 + clamp(skier.speed, 0, 46) * 0.72 + narrow;
-  camera.fov = damp(camera.fov, fovTarget, 3.2, dt);
-  camera.updateProjectionMatrix();
-}
-
-/* --- 스키어 시각 업데이트 --- */
-let trailAccum = 0;
-function updateSkierVisual(dt, tNow){
-  if (!skierGroup) return;
-  skierGroup.position.set(skier.x, skier.y + 0.02, skier.z);
-  const spinRot = skier.airborne ? -skier.spin : 0;
-  skierGroup.rotation.y = -skier.heading + spinRot;
-
-  const leanVis = skier.lean * (skier.airborne ? 0.35 : 1);
-  skierTilt.rotation.z = damp(skierTilt.rotation.z, -leanVis * 0.55, 10, dt);
-  skierTilt.rotation.x = damp(skierTilt.rotation.x, skier.crouch * 0.35 + (skier.airborne ? -0.15 : 0), 8, dt);
-  skierTilt.position.y = -skier.crouch * 0.22;
-  skierGroup.visible = true;
-
-  // 스키 자국
-  if (!skier.airborne && !skier.grinding && skier.speed > 2){
-    trailAccum += skier.speed * dt;
-    if (trailAccum > 0.55){
-      trailAccum = 0;
-      const rx = Math.cos(skier.heading), rz = Math.sin(skier.heading);
-      const bx = skier.x - Math.sin(skier.heading) * 0.45;
-      const bz = skier.z + Math.cos(skier.heading) * 0.45;
-      const gy = skier.y;
-      trailL.push(bx + rx * 0.19, gy + 0.05, bz + rz * 0.19, bx + rx * 0.05, gy + 0.05, bz + rz * 0.05);
-      trailR.push(bx - rx * 0.05, gy + 0.05, bz - rz * 0.05, bx - rx * 0.19, gy + 0.05, bz - rz * 0.19);
-    }
-  }
-
-  // 스프레이
-  const carve = Math.abs(skier.lean);
-  if (!skier.airborne && skier.speed > 9 && (carve > 0.25 || skier.speed > 22)){
-    const n = Math.min(4, Math.floor(skier.speed / 8));
-    for (let i = 0; i < n; i++){
-      const side = Math.sign(skier.lean) || 1;
-      const rx = Math.cos(skier.heading), rz = Math.sin(skier.heading);
-      const px = skier.x - Math.sin(skier.heading) * (0.6 + Math.random()*0.8) + rx * side * 0.35;
-      const pz = skier.z + Math.cos(skier.heading) * (0.6 + Math.random()*0.8) + rz * side * 0.35;
-      spray.spawn(px, skier.y + 0.1, pz,
-        rx * side * (1 + Math.random()*2.4) - Math.sin(skier.heading) * 1.2,
-        1.4 + Math.random()*2.6,
-        rz * side * (1 + Math.random()*2.4) + Math.cos(skier.heading) * 1.2,
-        0.45 + Math.random()*0.55);
-    }
-  }
-}
-
-/* ---------------------------------------------------------------- 6 HUD/UI */
-function showScreen(id){
-  ['screenTitle','screenPause','screenResult','shop','purchase'].forEach(k => {
-    const el = $(k);
-    if (el) el.classList.toggle('hidden', k !== id);
-  });
-  document.body.classList.toggle('modal-open', !!id && id !== 'screenPause');
-}
-function hideAllScreens(){
-  ['screenTitle','screenPause','screenResult','shop','purchase'].forEach(k => {
-    const el = $(k);
-    if (el) el.classList.add('hidden');
-  });
-}
-
-function updateCountdownUI(n){
-  const el = $('countdownText');
-  if (n > 0){
-    el.textContent = String(n);
-    el.className = 'anim';
-  } else {
-    el.textContent = 'GO';
-    el.className = 'go anim';
-  }
-  void el.offsetWidth;
-  el.classList.add('anim');
-}
-
-function updateHud(force){
-  const best = leaderboard.getBest(currentMap.id, 'race');
-  $('hudMap').textContent = currentMap.name;
-  $('hudGlyph').textContent = currentMap.glyph;
-  $('hudModeTag').textContent = state.mode === 'race' ? 'RACE' : 'PARK';
-  $('hudTimer').textContent = fmtTime(state.time);
-  if (state.mode === 'race'){
-    $('hudGate').textContent = `Gate ${state.gatesPassed}/16`;
-    const m = currentMap.medal;
-    $('hudMedal').textContent = `GOLD ${m.gold.toFixed(3)}`;
-    $('gateFill').style.width = (state.gatesPassed / 16 * 100) + '%';
-  } else {
-    $('hudGate').textContent = `TRICKS ${state.trickCount}`;
-    $('hudMedal').textContent = `BEST ${state.bestTrick} PTS`;
-    $('gateFill').style.width = Math.min(100, state.bestTrick) + '%';
-  }
-  const mph = Math.round(skier.speed * 2.23694);
-  $('hudSpeed').textContent = mph;
-  $('speedFill').style.width = clamp(skier.speed / P.maxSpeed * 100, 0, 100) + '%';
-  $('hudBest').textContent = state.mode === 'race' ? (best ? fmtTime(best.time) : '--:--.---') : '—';
-  $('hudGhost').textContent = state.mode !== 'race' ? '—' : (state.ghostFrames.length ? (state.ghostEnabled ? 'ON' : 'OFF') : 'NONE');
-  const chip = $('airChip');
-  if (state.mode === 'park' && state.phase === 'play' && skier.airborne && skier.airTime > 0.12){
-    chip.classList.remove('hidden');
-    $('airChipText').innerHTML = `SPIN <b>${Math.round(Math.abs(skier.spin) * 180 / Math.PI)}°</b> · ${skier.airTime.toFixed(2)}s`;
-  } else {
-    chip.classList.add('hidden');
-  }
-  $('vignette').style.opacity = String(clamp((skier.speed - 16) / 34, 0, 1) * 0.85);
-}
-
-let toastTimer = null;
-function toast(msg, ms = 1800){
-  const el = $('toast');
-  el.textContent = msg;
-  el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
-}
-
-/* --- 타이틀 칩 --- */
-function updateTitleChips(){
-  const wrap = $('titleMapList');
-  wrap.innerHTML = '';
-  for (const m of MAPS){
-    const owned = store.isOwned(m.id);
-    const el = document.createElement('button');
-    el.className = 'chip' + (m.id === state.mapId ? ' sel' : '') + (owned ? '' : ' locked');
-    el.dataset.id = m.id;
-    el.innerHTML = owned
-      ? `<span class="glyph">${m.glyph}</span><span>${m.name}</span>`
-      : `<span class="glyph">${m.glyph}</span><span>${m.name}</span><span class="lock">🔒</span><span class="price">${money(m.price)}</span>`;
-    el.onclick = () => {
-      if (!store.isOwned(m.id)){ openShop('map'); return; }
-      state.mapId = m.id;
-      store.equip(m.id);
-      loadWorld(m.id);
-      resetSkier();
-      updateTitleChips();
-      toast(`${m.name} 선택됨`);
-    };
-    wrap.appendChild(el);
-  }
-}
-
-/* --- 상점 --- */
-let shopFilter = null;
-function renderShop(){
-  const skinsWrap = $('shopSkins');
-  const mapsWrap = $('shopMaps');
-  skinsWrap.innerHTML = '';
-  mapsWrap.innerHTML = '';
-
-  for (const item of store.list('skin')){
-    const el = document.createElement('button');
-    el.className = 'card' + (item.equipped ? ' equipped' : '');
-    el.dataset.id = item.id;
-    const badge = item.equipped
-      ? `<span class="badge live">착용중</span>`
-      : item.owned ? `<span class="badge owned">보유</span>`
-      : item.price === 0 ? `<span class="badge free">FREE</span>`
-      : `<span class="badge price">${money(item.price)}</span>`;
-    el.innerHTML = `
-      <div class="card-art" style="background:${item.preview}">
-        <span class="glyph">⛷</span>${badge}
-      </div>
-      <div class="card-body">
-        <div class="card-name">${item.name}</div>
-        <div class="card-desc">${item.desc}</div>
-      </div>
-      <div class="card-foot">
-        <span>${item.owned ? '잠금해제됨' : '유료 스킨'}</span>
-        <span class="cta ${item.equipped ? 'on' : item.owned ? '' : 'buy'}">${item.equipped ? '착용중' : item.owned ? '장착하기' : '구매하기'}</span>
-      </div>`;
-    el.onclick = () => onCardClick(item);
-    skinsWrap.appendChild(el);
-  }
-
-  for (const item of store.list('map')){
-    const el = document.createElement('button');
-    el.className = 'card' + (item.equipped ? ' equipped' : '');
-    el.dataset.id = item.id;
-    const badge = item.equipped
-      ? `<span class="badge live">플레이중</span>`
-      : item.owned ? `<span class="badge owned">보유</span>`
-      : item.price === 0 ? `<span class="badge free">FREE</span>`
-      : `<span class="badge price">${money(item.price)}</span>`;
-    el.innerHTML = `
-      <div class="card-art" style="background:${item.storeCss}">
-        <span class="glyph" style="font-size:26px">${item.glyph}</span>${badge}
-      </div>
-      <div class="card-body">
-        <div class="card-name">${item.name}</div>
-        <div class="card-desc">${item.blurb}<br><span style="opacity:.75">GOLD ${item.medal.gold.toFixed(3)}</span></div>
-      </div>
-      <div class="card-foot">
-        <span>${item.owned ? '잠금해제됨' : '유료 코스'}</span>
-        <span class="cta ${item.owned ? (item.equipped ? 'on' : '') : 'buy'}">${item.equipped ? '플레이중' : item.owned ? '이 코스로 플레이' : '구매하기'}</span>
-      </div>`;
-    el.onclick = () => onCardClick(item);
-    mapsWrap.appendChild(el);
-  }
-}
-
-function onCardClick(item){
-  if (!store.isOwned(item.id)){ openPurchase(item); return; }
-  store.equip(item.id);
-  if (item.kind === 'skin'){
-    state.skinId = item.id;
-    applySkinVisual();
-    buildGhost();
-    toast(`${item.name} 착용 완료`);
-    renderShop();
-  } else {
-    state.mapId = item.id;
-    loadWorld(item.id);
-    renderShop();
-    updateTitleChips();
-    toast(`${item.name} 로드 중`);
-    closeShop();
-    startRun(state.mode);
-  }
-}
-
-let shopReturn = 'title';
-function openShop(focus){
-  shopFilter = focus || null;
-  if (!$('screenPause').classList.contains('hidden')) shopReturn = 'pause';
-  else if (!$('screenResult').classList.contains('hidden')) shopReturn = 'result';
-  else if (state.phase === 'title') shopReturn = 'title';
-  else shopReturn = 'play';
-  renderShop();
-  showScreen('shop');
-  if (state.phase === 'play' || state.phase === 'countdown'){ state.paused = true; }
-}
-
-function closeShop(){
-  $('shop').classList.add('hidden');
-  $('purchase').classList.add('hidden');
-  if (shopReturn === 'title'){ showScreen('screenTitle'); return; }
-  if (shopReturn === 'pause'){ showScreen('screenPause'); return; }
-  if (shopReturn === 'result'){ showScreen('screenResult'); return; }
-  hideAllScreens();
-  if (state.phase === 'play' || state.phase === 'countdown'){
-    state.paused = false;
-    last = performance.now();
-    accumulator = 0;
-  }
-}
-
-let pendingItem = null;
-function openPurchase(item){
-  pendingItem = item;
-  $('payName').textContent = item.name;
-  $('payPrice').textContent = money(item.price);
-  $('payKind').textContent = item.kind === 'skin' ? '스킨' : '맵 / 코스';
-  $('payStatus').textContent = '';
-  $('payConfirm').disabled = false;
-  $('payConfirm').textContent = '결제 잠금해제';
-  $('purchase').classList.remove('hidden');
-}
-function closePurchase(){
-  $('purchase').classList.add('hidden');
-  if ($('shop').classList.contains('hidden')){
-    if (shopReturn === 'title') showScreen('screenTitle');
-    else if (shopReturn === 'result') showScreen('screenResult');
-  }
-}
-
-async function confirmPurchase(){
-  if (!pendingItem) return;
-  const btn = $('payConfirm');
-  btn.disabled = true;
-  btn.textContent = '처리 중...';
-  $('payStatus').textContent = '테스트 결제를 처리하고 있습니다…';
-  try {
-    const res = await store.purchase(pendingItem.id);
-    $('payStatus').textContent = res.status === 'succeeded'
-      ? `결제 완료 · ${res.receipt} · 즉시 잠금해제`
-      : '이미 보유한 상품입니다.';
-    store.equip(pendingItem.id);
-    if (pendingItem.kind === 'skin'){
-      state.skinId = pendingItem.id;
-      applySkinVisual();
-      buildGhost();
-    } else {
-      state.mapId = pendingItem.id;
-      loadWorld(pendingItem.id);
-      updateTitleChips();
-    }
-    renderShop();
-    toast(`${pendingItem.name} 잠금해제 · 즉시 적용`, 2200);
-    setTimeout(() => {
-      $('purchase').classList.add('hidden');
-      renderShop();
-      pendingItem = null;
-    }, 850);
-  } catch(err){
-    $('payStatus').textContent = '결제 실패: ' + err.message;
-    btn.disabled = false;
-    btn.textContent = '다시 시도';
-  }
-}
-
-/* --- 일시정지 --- */
-function pauseGame(){
-  if (state.phase !== 'play' && state.phase !== 'countdown') return;
-  state.paused = true;
-  showScreen('screenPause');
-}
-function resumeGame(){
-  if (state.phase !== 'play' && state.phase !== 'countdown') return;
-  state.paused = false;
-  hideAllScreens();
-  last = performance.now();
-}
-
-function quitToTitle(){
-  state.phase = 'title';
-  state.paused = false;
-  hideAllScreens();
-  $('hud').classList.add('hidden');
-  $('countdown').classList.add('hidden');
-  $('trickFeed').innerHTML = '';
-  resetSkier();
-  loadWorld(state.mapId);
-  resetSkier();
-  updateTitleChips();
-  showScreen('screenTitle');
-}
-
-/* --- 입력 --- */
-function bindInput(){
-  const keyMap = {
-    ArrowLeft:'left', KeyA:'left',
-    ArrowRight:'right', KeyD:'right',
-    ArrowUp:'up', KeyW:'up',
-    ArrowDown:'down', KeySdown:'down',
-    Space:'jump'
-  };
-  window.addEventListener('keydown', (e) => {
-    if (e.repeat){
-      if (e.code === 'Space') e.preventDefault();
-      return;
-    }
-    switch (e.code){
-      case 'ArrowLeft': case 'KeyA': input.left = true; e.preventDefault(); break;
-      case 'ArrowRight': case 'KeyD': input.right = true; e.preventDefault(); break;
-      case 'ArrowUp': case 'KeyW': input.up = true; e.preventDefault(); break;
-      case 'ArrowDown': case 'KeyS': input.down = true; e.preventDefault(); break;
-      case 'Space': input.jumpQueued = true; e.preventDefault(); break;
-      case 'Escape': case 'KeyP':
-        if (state.phase === 'play' || state.phase === 'countdown'){
-          state.paused ? resumeGame() : pauseGame();
-        }
-        break;
-      case 'KeyR':
-        if (state.phase === 'play' || state.phase === 'finish' || state.paused) startRun(state.mode);
-        break;
-      case 'KeyG':
-        if (state.ghostFrames.length){ state.ghostEnabled = !state.ghostEnabled; toast('고스트 ' + (state.ghostEnabled ? 'ON' : 'OFF')); }
-        break;
-      case 'KeyB':
-        if (state.phase === 'title' || state.phase === 'play' || state.phase === 'finish') openShop();
-        break;
-    }
-  });
-  window.addEventListener('keyup', (e) => {
-    switch (e.code){
-      case 'ArrowLeft': case 'KeyA': input.left = false; break;
-      case 'ArrowRight': case 'KeyD': input.right = false; break;
-      case 'ArrowUp': case 'KeyW': input.up = false; break;
-      case 'ArrowDown': case 'KeyS': input.down = false; break;
-    }
-  });
-
-  // 터치 패드
-  document.querySelectorAll('#touchpad .tbtn').forEach(btn => {
-    const key = btn.dataset.key;
-    const on = (e) => {
-      e.preventDefault();
-      if (key === 'jump') input.jumpQueued = true; else input[key] = true;
-      btn.classList.add('on');
-    };
-    const off = (e) => {
-      e.preventDefault();
-      if (key !== 'jump') input[key] = false;
-      btn.classList.remove('on');
-    };
-    btn.addEventListener('pointerdown', on);
-    btn.addEventListener('pointerup', off);
-    btn.addEventListener('pointercancel', off);
-    btn.addEventListener('pointerleave', off);
-  });
-  if (window.matchMedia('(pointer: coarse)').matches) document.body.classList.add('touch');
-  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once:true, passive:true });
-}
-
-/* --- 버튼 연결 --- */
-function bindButtons(){
-  $('btnRaceStart').onclick = () => startRun('race');
-  $('btnParkStart').onclick = () => startRun('park');
-  $('btnTitleShop').onclick = () => openShop();
-
-  $('btnShop').onclick = () => openShop();
-  $('btnPause').onclick = () => pauseGame();
-  $('btnRestart').onclick = () => startRun(state.mode);
-  $('btnMode').onclick = () => {
-    const next = state.mode === 'race' ? 'park' : 'race';
-    startRun(next);
-    toast(next === 'park' ? 'PARK 모드 · 킥커/레일에서 트릭' : 'RACE 모드 · 16게이트 타임어택');
-  };
-
-  $('btnResume').onclick = () => resumeGame();
-  $('btnPauseRestart').onclick = () => startRun(state.mode);
-  $('btnPauseShop').onclick = () => openShop();
-  $('btnQuit').onclick = () => quitToTitle();
-
-  $('btnRetry').onclick = () => startRun('race');
-  $('btnResShop').onclick = () => openShop();
-  $('btnResQuit').onclick = () => quitToTitle();
-
-  $('shopClose').onclick = () => closeShop();
-  $('payCancel').onclick = () => closePurchase();
-  $('payConfirm').onclick = () => confirmPurchase();
-
-  $('shop').addEventListener('click', (e) => { if (e.target.id === 'shop') closeShop(); });
-  $('purchase').addEventListener('click', (e) => { if (e.target.id === 'purchase') closePurchase(); });
-}
-
-/* ---------------------------------------------------------------- 7 루프 */
-let last = performance.now();
-let elapsed = 0;
-let accumulator = 0;
-const STEP = 1 / 60;
-
-function simulate(dt){
-  elapsed += dt;
-  if (state.paused) return;
-
-  if (state.phase === 'countdown'){
-    const prev = Math.ceil(state.countdown);
-    state.countdown -= dt;
-    const nowC = Math.ceil(state.countdown);
-    if (nowC !== prev && nowC >= 0) updateCountdownUI(nowC);
-    if (state.countdown <= 0){
-      state.phase = 'play';
-      $('countdown').classList.add('hidden');
-      skier.speed = 7.5;
-      toast('GO! · ' + (state.mode === 'race' ? '16 GATES' : 'FIND THE KICKERS'), 1200);
-    }
-  } else if (state.phase === 'play'){
-    state.time += dt;
-    stepPhysics(dt);
-    checkGates();
-    updateGhost(dt);
-    updateSkierVisual(dt, elapsed);
-
-    if (state.mode === 'race' && state.time - state.recordT > 0.05){
-      state.recordT = state.time;
-      state.record.push({
-        t:+state.time.toFixed(3), x:+skier.x.toFixed(2), y:+skier.y.toFixed(2),
-        z:+skier.z.toFixed(2), h:+skier.heading.toFixed(3), l:+skier.lean.toFixed(2)
-      });
-    }
-    if (state.mode === 'park' && skier.z < -currentMap.length + 10){
-      toast('코스 끝 · 파크 세션 종료', 2200);
-      quitToTitle();
-    }
-  } else if (state.phase === 'title' || state.phase === 'finish'){
-    updateSkierVisual(dt, elapsed);
-  }
-}
-
-let qualityStep = 0;
-function applyQuality(){
-  const base = Math.min(window.devicePixelRatio || 1, 1.75);
-  if (qualityStep === 1){
-    renderer.setPixelRatio(Math.min(base, 1.15));
-    sunLight.shadow.mapSize.set(512, 512);
-  } else if (qualityStep === 2){
-    renderer.setPixelRatio(Math.min(base, 1));
-    sunLight.shadow.mapSize.set(512, 512);
-  }
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
-}
-
-let fpsFrames = 0, fpsT = performance.now(), fpsEstimate = 60, lowStreak = 0;
-function watchFps(now){
-  fpsFrames++;
-  const dtms = now - fpsT;
-  if (dtms >= 1000){
-    fpsEstimate = Math.round(fpsFrames * 1000 / dtms);
-    fpsFrames = 0; fpsT = now;
-    if (fpsEstimate < 26 && qualityStep < 2){
-      lowStreak++;
-      if (lowStreak >= 2){ qualityStep++; applyQuality(); lowStreak = 0; }
-    } else if (fpsEstimate > 40){
-      lowStreak = 0;
-    }
-  }
-}
-
-function tick(now){
-  requestAnimationFrame(tick);
-  let frameDt = (now - last) / 1000;
-  last = now;
-  if (!isFinite(frameDt) || frameDt <= 0) frameDt = 1 / 60;
-  frameDt = Math.min(frameDt, 0.25);
-
-  if (!state.paused){
-    accumulator += frameDt;
-    let steps = 0;
-    while (accumulator >= STEP && steps < 16){
-      simulate(STEP);
-      accumulator -= STEP;
-      steps++;
-      if (state.phase === 'finish'){ accumulator = 0; break; }
-    }
-    if (steps >= 16) accumulator = 0;
-  } else {
-    accumulator = 0;
-  }
-
-  spray.update(frameDt);
-  updateCamera(frameDt, elapsed);
-
-  if (!currentMap.night){
-    sunLight.position.set(skier.x + currentMap.sun.pos[0]*0.35, skier.y + currentMap.sun.pos[1]*0.5, skier.z + currentMap.sun.pos[2]*0.35);
-    sunLight.target.position.set(skier.x, skier.y, skier.z);
-  }
-
-  if (state.phase !== 'title') updateHud();
-  watchFps(now);
-  renderer.render(scene, camera);
-}
-
-/* ---------------------------------------------------------------- 8 부트 */
-function onResize(){
-  const w = window.innerWidth, h = window.innerHeight;
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-}
-window.addEventListener('resize', onResize);
-
-function boot(){
-  state.mapId = store.equipped('map');
-  state.skinId = store.equipped('skin');
-  buildSky(mapById(state.mapId));
-  loadWorld(state.mapId);
-  applySkinVisual();
-  resetSkier();
-  bindInput();
-  bindButtons();
-  updateTitleChips();
-  renderShop();
-
-  $('hud').classList.add('hidden');
-  showScreen('screenTitle');
-  $('loading').style.opacity = '0';
-  setTimeout(() => $('loading').classList.add('hidden'), 550);
-  window.__carve.ready = true;
-  requestAnimationFrame(tick);
-}
-
-/* --- 테스트/디버그 API --- */
-window.__carve = {
-  ready: false,
-  state(){
-    return {
-      phase: state.phase, paused: state.paused, mode: state.mode,
-      mapId: state.mapId, mapName: currentMap.name, skinId: state.skinId,
-      time: +state.time.toFixed(3), speed: +skier.speed.toFixed(2),
-      mph: Math.round(skier.speed * 2.23694),
-      gates: state.gatesPassed, airborne: skier.airborne,
-      grinding: skier.grinding, grindTime: +skier.grindTime.toFixed(2),
-      airTime: +skier.airTime.toFixed(2),
-      spinDeg: Math.round(Math.abs(skier.spin) * 180 / Math.PI),
-      bestTrick: state.bestTrick, trickCount: state.trickCount,
-      trickLog: state.trickLog.slice(-10),
-      shopOpen: !$('shop').classList.contains('hidden'),
-      purchaseOpen: !$('purchase').classList.contains('hidden'),
-      resultOpen: !$('screenResult').classList.contains('hidden'),
-      owned: store._state().owned.slice(),
-      equippedSkin: store.equipped('skin'), equippedMap: store.equipped('map'),
-      ghostFrames: state.ghostFrames.length,
-      fps: fpsEstimate
-    };
-  },
-  startRun, quitToTitle, openShop, closeShop, confirmPurchase,
-  buy(id){ return store.purchase(id); },
-  equip(id){ return store.equip(id); },
-  resetStore(){ store.reset(); },
-  setMap(id){ loadWorld(id); resetSkier(); updateTitleChips(); },
-  setSkin(id){ state.skinId = id; applySkinVisual(); buildGhost(); },
-  advance(seconds){
-    const n = Math.max(1, Math.round(seconds / STEP));
-    for (let i = 0; i < n; i++){ simulate(STEP); updateCamera(STEP, elapsed); }
-    return true;
-  },
-  quality(step){ qualityStep = step; applyQuality(); },
-  freeze(on){
-    state.paused = !!on;
-    if (!on){ last = performance.now(); accumulator = 0; }
-    return state.paused;
-  },
-  perf(){ return { fps: fpsEstimate, quality: qualityStep, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; },
-  gates(){ return state.gates.map(g => ({ i:g.index, x:g.x, z:g.z, passed:g.passed })); },
-  nav(){
-    return {
-      x:skier.x, z:skier.z, heading:skier.heading, speed:skier.speed,
-      phase:state.phase, gatesPassed:state.gatesPassed, gates:state.gates.map(g => ({ i:g.index, x:g.x, z:g.z, passed:g.passed }))
-    };
-  },
-  skier(){ return { x:skier.x, y:skier.y, z:skier.z, heading:skier.heading, speed:skier.speed }; }
-};
-function applySkinVisible(){ applySkinVisual(); }
-
-window.addEventListener('error', (e) => {
-  const el = $('fatal');
-  if (el){ el.style.display = 'grid'; el.textContent = '오류: ' + (e.message || 'unknown'); }
-});
-
-boot();
-</script>
 </body>
 </html>
