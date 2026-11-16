@@ -69,8 +69,8 @@ export class ChaseCamera {
     // calm the sideways offset so the rider stays in frame
     const narrow = clamp(0.95 / Math.max(0.35, cam.aspect), 1, 1.62);
     const side = skier.edge * 1.1 / narrow;
-    const dist = (4.15 + speed * 0.026 + tuck * 0.25) * Math.min(1.18, narrow * 0.92);
-    const height = 1.82 + speed * 0.008 - tuck * 0.18;
+    const dist = (3.9 + speed * 0.024 + tuck * 0.22) * Math.min(1.18, narrow * 0.92);
+    const height = 1.74 + speed * 0.007 - tuck * 0.16;
     const fx = Math.sin(this.yaw);
     const fz = -Math.cos(this.yaw);
     _pos.set(
@@ -110,7 +110,7 @@ export class ChaseCamera {
     const rollTarget = -skier.edge * 0.085;
     this.roll = damp(this.roll, rollTarget, 6, dt);
     cam.rotateZ(this.roll);
-    const fovTarget = Math.min(92, (54 + clamp(speed, 0, 40) * 0.16 + skier.edge * 2 + tuck * 5.5) * narrow);
+    const fovTarget = Math.min(92, (52 + clamp(speed, 0, 40) * 0.12 + skier.edge * 2 + tuck * 5) * narrow);
     this.fov = damp(this.fov, fovTarget, 3.2, dt);
     cam.fov = this.fov;
     cam.updateProjectionMatrix();
