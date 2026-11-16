@@ -56,9 +56,10 @@ export class ChaseCamera {
 
     // camera yaw trails the skier's heading a little for a natural swing
     let dy = skier.heading - this.yaw;
-    while (dy > Math.PI) dy -= Math.PI * 2;
-    while (dy < -Math.PI) dy += Math.PI * 2;
+    if (!isFinite(dy)) dy = 0;
+    dy = Math.atan2(Math.sin(dy), Math.cos(dy)); // wrap to [-π, π] without loops
     this.yaw += dy * (1 - Math.exp(-7 * dt));
+    if (!isFinite(this.yaw)) this.yaw = skier.heading || 0;
 
     const speed = skier.speed;
     const dist = 4.7 + speed * 0.04;

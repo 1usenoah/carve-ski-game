@@ -64,6 +64,17 @@ export class SkierPhysics {
   /** input: { left, right, tuck, brake, jump } (booleans) */
   update(dt, input) {
     const t = this.terrain;
+    // safety net: never let a bad frame poison the simulation
+    if (!Number.isFinite(this.x) || !Number.isFinite(this.z) || !Number.isFinite(this.heading)) {
+      const z = START_Z - 22;
+      this.x = t.centerX(z);
+      this.z = z;
+      this.y = t.heightAt(this.x, z);
+      this.heading = t.headingAt(z);
+      this.speed = 0;
+      this.vy = 0;
+      this.airborne = false;
+    }
     this.landedThisFrame = false;
     const steerInput = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     this.steer = damp(this.steer, steerInput, 7, dt);
@@ -75,6 +86,7 @@ export class SkierPhysics {
     if (this.airborne) edgeTarget *= 0.35;
     if (this.brake) edgeTarget = 0;
     this.edge = damp(this.edge, edgeTarget, this.airborne ? 3 : 4.2, dt);
+    if (!Number.isFinite(this.edge)) this.edge = 0;
 
     // ── carve: heading changes at g·tan(edge)/v ──
     let omega = (G * Math.tan(this.edge)) / Math.max(this.speed, 3.2);
@@ -100,6 +112,7 @@ export class SkierPhysics {
       const railDrag = this.rail ? 0.9 : 0;
       this.speed += (grav - drag - scrub - railDrag) * dt;
       this.speed = clamp(this.speed, 0, 62);
+      if (!Number.isFinite(this.speed)) this.speed = 0;
     } else {
       this.speed -= this.speed * 0.045 * dt; // a little air drag
     }
