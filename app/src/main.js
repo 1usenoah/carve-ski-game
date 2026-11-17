@@ -92,14 +92,14 @@ const input = { left: false, right: false, axis: null, tuck: false, brake: false
 const touch = new TouchControls(input);
 const chase = new ChaseCamera(camera);
 
-const BUILD = 'v2.2.0';
+const BUILD = 'v3.0.0';
 
 // FIS giant-slalom set: 28 gates over the 1 km piste, turning poles 16–22 m
 // apart across the fall line, 34–41 m between gates.
 const GATE_COUNT = 28;
 
 // Medal times the course setter aimed at.
-const TARGETS = { gold: 66, silver: 74, bronze: 84 };
+const TARGETS = { gold: 74, silver: 84, bronze: 94 };
 const S = {
   state: 'loading',           // loading | menu | countdown | running | paused | result
   runMode: 'race',
@@ -463,6 +463,11 @@ function tick(dt) {
   const prevZ = S.prevZ;
   const prevX = S.prevX;
   if (S.autopilot) autopilotInput(p);
+  // the reference's gentle gate assist needs to know the next gate's plane
+  const nextGate = ctx.gates?.list[ctx.gates.current] ?? null;
+  p.assist = nextGate
+    ? { tx: nextGate.tx, tz: nextGate.tz, d: nextGate.w, u: nextGate.u, width: nextGate.width }
+    : null;
   p.update(dt, input);
   S.prevZ = p.z;
   S.prevX = p.x;
@@ -480,6 +485,15 @@ function tick(dt) {
         S.penalty += 2;
         hud.judge({ label: 'MISSED GATE', tone: 'wide', sub: `${res.reason} · +2.00s` });
         audio.tone(220, 0.3, 'sawtooth', 0.1);
+      } else if (res.label === 'BRUSHED THE POLE') {
+        S.clean += 1;
+        hud.judge({
+          label: res.label,
+          tone: 'tight',
+          sub: `${res.s.toFixed(2)} m — brushed it, still through`,
+        });
+        audio.gate(false);
+        ctx.effects.gateBurst(tmpV.set(g.tx, g.y + 0.4, g.tz), g.color, 18);
       } else {
         if (res.clean) S.clean += 1;
         hud.judge({
@@ -793,7 +807,7 @@ $('btnHelp').onclick = () => {
   audio.click();
   hud.toast(
     touch.isTouch
-      ? '화면을 좌우로 드래그해 카빙 · 아래로 스와이프하면 브레이크 · CROUCH 홀드'
+      ? '화면 왼쪽/오른쪽을 누르고 있으면 조향 · CROUCH 를 누르면 턱 · BRAKE 는 정지'
       : '← → 카빙 · ↑/SHIFT 턱 · ↓ 브레이크 · ESC 일시정지 · M 음소거'
   );
 };
@@ -853,7 +867,7 @@ async function boot() {
       if (S.state === 'menu') {
         hud.toast(
           touch.isTouch
-            ? '좌우로 드래그해 카빙하세요'
+            ? '화면 왼쪽/오른쪽을 누르고 있으면 카빙합니다'
             : '← → 로 카빙, ↑ 턱 (RACE에는 점프 없음)'
         );
       }

@@ -22,28 +22,33 @@ import { FINISH_Z, PISTE_HALF } from './terrain.js';
  * gates, the turning poles 16–22 m apart across the fall line.
  * ───────────────────────────────────────────────────────────── */
 
-const GATE_RED = 0xdc1f28;
-const GATE_BLUE = 0x1747e0;
+const GATE_RED = 0xd6303f;
+const GATE_BLUE = 0x2a5bd7;
 
-const PANEL_W = 0.75;        // FIS: ≈75 cm wide
-const PANEL_H = 0.50;        // FIS: ≈50 cm high
-const PANEL_BOTTOM = 1.00;   // FIS: lower edge ≈1 m above the snow
-const POLE_H = 2.02;         // ≈2 m poles
-const POLE_GAP = 0.70;       // the two poles of one flag set (the panel spans them)
-const GS_WIDTH = 6.4;        // turning pole → outside pole (FIS 4–8 m)
+const PANEL_W = 1.15;        // reference panel: a wide cloth flag
+const PANEL_H = 0.68;
+const PANEL_BOTTOM = 1.05;   // lower edge ≈1 m above the snow
+const POLE_H = 1.92;         // ≈1.9 m poles
+const POLE_GAP = 0.95;       // the two poles of one flag set (the panel spans them)
+const SG_WIDTH = 8.0;        // turning pole → outside pole (reference SG gateWidth)
 
-const APEX_AMP = 9.4;        // metres the turning pole swings off the centre
-const PANEL_CLEAR = 0.36;    // the skis must clear the panel hanging on the poles
+const PASS_INSIDE = 1.05;    // how far inside the turning pole still counts
+const PASS_OUTSIDE = 1.25;   // how far past the outside pole still counts
+const RIDE_OFF = 0.9;        // the painted line runs this far outside the pole
 
-/* Long / medium / short turns and delayed gates (the course holds the same
- * side twice), exactly the tempo a GS setter builds into a run. */
-const PHRASE = [
-  [1, 1.00], [-1, 0.82], [1, 0.94], [-1, 1.02],
-  [1, 0.70], [-1, 0.90], [1, 1.04], [-1, 0.66],
-  [-1, 0.52], [1, 0.96], [-1, 0.86], [1, 0.72],
-  [1, 1.00], [-1, 0.62], [1, 0.92], [-1, 1.04],
+/* The course is set with the reference's own Super-G numbers: each entry is
+ * [gap along the fall line, offset of the turning pole from the centre line,
+ * drift of the centre line]. These are the Larchwood + Plateau runs from
+ * carvemania's course data, so the rhythm — long 43–45 m sweepers, tighter
+ * 33–38 m turns, drifts of a few metres — is the reference rhythm. */
+const REF_LAYOUT = [
+  [39, 5.5, -1.5], [38.5, 6.5, -2], [41.5, 7, 2.5], [39.5, 7.5, 3],
+  [37.5, 7, 1.5], [43, 6.5, -2], [39.5, 7, -2.5], [39.5, 5.5, -1.5],
+  [43.5, 5, 2], [41.5, 5.5, 3.5], [38.5, 6.5, -0.5], [45, 7, -2.5],
+  [45, 7.5, -0.5], [33.5, 7, 2.5], [44.5, 6.5, 0], [42.5, 6, 0],
+  [40, 7, 1], [44, 6.5, 2.5], [38.5, 6, -2], [42, 7.5, 1.5],
+  [40, 6.5, -1], [43.5, 7, 2], [39, 6, 0], [41, 6.8, -1.5],
 ];
-const GAPS = [36, 38, 34, 40, 33, 39, 37, 41, 35, 38, 36, 40];
 
 /* ─────────────────────────────────────────────────────────────
  * Textures
@@ -204,6 +209,101 @@ function ribbonGeometry(samples, width, { tile = 7, lift = 0.035 } = {}) {
   return geo;
 }
 
+/* ─────────────────────────────────────────────────────────────
+ * The reference's painted line is not a continuous stripe: it is a run of
+ * soft, rounded dashes — a light blue powder mark about 2 m long with a 2 m
+ * gap — laid along the ideal arc. This builds those quads in one geometry.
+ * ───────────────────────────────────────────────────────────── */
+
+function makeDashTexture() {
+  const W = 64;
+  const H = 256;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  const g = c.getContext('2d');
+  const r = 30;
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = '#ffffff';
+  g.beginPath();
+  g.moveTo(2 + r * 0, 2 + r);
+  g.arcTo(W - 2, 2, W - 2, H - 2, r);
+  g.arcTo(W - 2, H - 2, 2, H - 2, r);
+  g.arcTo(2, H - 2, 2, 2, r);
+  g.arcTo(2, 2, W - 2, 2, r);
+  g.closePath();
+  g.fill();
+  // a slightly ragged edge, like powder sprayed on snow
+  const img = g.getImageData(0, 0, W, H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (!img.data[i + 3]) continue;
+      const n = Math.sin(x * 1.7 + y * 0.9) * 0.5 + Math.sin(y * 2.3) * 0.5;
+      img.data[i + 3] = Math.round(Math.min(255, img.data[i + 3] * (0.82 + 0.18 * n)));
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+
+function dashGeometry(samples, width, { dash = 2.1, gap = 1.85, lift = 0.045 } = {}) {
+  const segs = [];
+  let total = 0;
+  for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1];
+    const b = samples[i];
+    const l = Math.hypot(b.x - a.x, b.z - a.z);
+    if (l < 1e-5) continue;
+    segs.push({ a, b, l, s0: total });
+    total += l;
+  }
+  const at = (s, out) => {
+    let seg = segs[segs.length - 1];
+    for (let i = 0; i < segs.length; i++) {
+      if (s <= segs[i].s0 + segs[i].l) { seg = segs[i]; break; }
+    }
+    const u = clamp((s - seg.s0) / seg.l, 0, 1);
+    out.x = seg.a.x + (seg.b.x - seg.a.x) * u;
+    out.z = seg.a.z + (seg.b.z - seg.a.z) * u;
+    out.y = seg.a.y + (seg.b.y - seg.a.y) * u;
+    const tl = Math.hypot(seg.b.x - seg.a.x, seg.b.z - seg.a.z) || 1;
+    out.nx = -(seg.b.z - seg.a.z) / tl;
+    out.nz = (seg.b.x - seg.a.x) / tl;
+    return out;
+  };
+  const pos = [];
+  const uv = [];
+  const idx = [];
+  const p = { x: 0, y: 0, z: 0, nx: 0, nz: 0 };
+  const hw = width * 0.5;
+  let k = 0;
+  for (let s = 0; s < total - 0.3; s += dash + gap) {
+    const s1 = Math.min(total, s + dash);
+    if (s1 - s < 0.25) break;
+    const n = Math.max(2, Math.ceil((s1 - s) / 0.65));
+    for (let j = 0; j <= n; j++) {
+      at(s + ((s1 - s) * j) / n, p);
+      pos.push(p.x - p.nx * hw, p.y + lift, p.z - p.nz * hw);
+      pos.push(p.x + p.nx * hw, p.y + lift, p.z + p.nz * hw);
+      uv.push(0, j / n, 1, j / n);
+    }
+    for (let j = 0; j < n; j++) {
+      idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3);
+      k += 2;
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+  return geo;
+}
+
 function dyeMaterial(map, opacity, color = 0xffffff) {
   return new THREE.MeshBasicMaterial({
     map,
@@ -326,17 +426,18 @@ export class Gates {
     const n = this.count;
     const zFirst = -54;
     const zLast = FINISH_Z + 66;
-    const gaps = [];
-    for (let i = 0; i < n - 1; i++) gaps.push(GAPS[i % GAPS.length]);
-    const gapSum = gaps.reduce((a, b) => a + b, 0);
+    const rows = [];
+    for (let i = 0; i < n - 1; i++) rows.push(REF_LAYOUT[i % REF_LAYOUT.length]);
+    const gapSum = rows.reduce((a, b) => a + b[0], 0);
     const scale = (zFirst - zLast) / gapSum;
 
     const zs = [zFirst];
-    for (let i = 0; i < n - 1; i++) zs.push(zs[i] - gaps[i] * scale);
+    for (let i = 0; i < n - 1; i++) zs.push(zs[i] - rows[i][0] * scale);
 
     const apex = zs.map((z, i) => {
-      const [side, size] = PHRASE[i % PHRASE.length];
-      return { z, x: t.centerX(z) + side * size * APEX_AMP, side, size };
+      const [, offset, drift] = REF_LAYOUT[i % REF_LAYOUT.length];
+      const side = i % 2 === 0 ? 1 : -1;
+      return { z, x: t.centerX(z) + drift + side * offset, side, offset, drift };
     });
 
     const gates = [];
@@ -350,14 +451,13 @@ export class Gates {
       const wl = Math.hypot(wx, wz) || 1;
       wx /= wl;
       wz /= wl;
-      // right-hand side of that direction
+      // right-hand side of that direction; the gate opens on the side the
+      // turning pole sits, which is how the reference sets every gate
       const rx = -wz;
       const rz = wx;
-      // the gate opens away from the race line, i.e. away from the fall line
-      const outward = Math.sign(a.x - t.centerX(a.z)) || a.side;
-      const ux = rx * outward;
-      const uz = rz * outward;
-      const width = GS_WIDTH + 0.6 * Math.sin(i * 1.7) + 0.35 * Math.sin(i * 0.6);
+      const ux = rx * a.side;
+      const uz = rz * a.side;
+      const width = SG_WIDTH;
       // approach direction, for the diagonal face of the panels
       let ax = a.x - prev.x;
       let az = a.z - prev.z;
@@ -370,6 +470,7 @@ export class Gates {
         z: a.z,
         apexX: a.x,
         cx: t.centerX(a.z),
+        side: a.side,
         // turning pole sits on the race line; the gate line runs outward
         tx: a.x,
         tz: a.z,
@@ -400,9 +501,8 @@ export class Gates {
     const line = [];
     const first = pts[0];
     const last = pts[pts.length - 1];
-    // the paint runs half a metre outside the turning pole: it is the ski
-    // track, and the panel is what the shoulder clips on the way past
-    const RIDE_OFF = 0.85;
+    // the paint runs just outside the turning pole: it is the ski track, and
+    // the panel is what the shoulder clips on the way past
     const apexOf = (g) => new THREE.Vector3(g.tx + g.u.x * RIDE_OFF, 0, g.tz + g.u.z * RIDE_OFF);
     // run-in from the start and out to the finish, on the centre line
     const zIn = first.z + 64;
@@ -452,14 +552,28 @@ export class Gates {
     }
     this.guidePoints = line;
 
-    // the painted race line
-    const dyeLine = new THREE.Mesh(ribbonGeometry(line, 0.55, { tile: 6.5 }), dyeMaterial(this.dyeTex, 0.9));
-    dyeLine.renderOrder = 6;
+    // the painted race line: the reference's run of soft blue dashes
+    const dashMat = new THREE.MeshBasicMaterial({
+      map: makeDashTexture(),
+      color: 0x9cb8ec,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -6,
+      polygonOffsetUnits: -6,
+    });
+    this.dashMat = dashMat;
+    const dyeLine = new THREE.Mesh(dashGeometry(line, 0.62, { dash: 2.2, gap: 1.7, lift: 0.16 }), dashMat);
+    dyeLine.renderOrder = 7;
     dyeLine.frustumCulled = false;
     this.dyeGroup.add(dyeLine);
+    this.dyeLine = dyeLine;
 
-    // a fainter second line just outside it, the way the crew double-sprays a line
-    const halo = new THREE.Mesh(ribbonGeometry(line, 1.9, { lift: 0.028, tile: 6.5 }), dyeMaterial(this.dyeTex, 0.16));
+    // a fainter wide swath under the dashes, the way the crew double-sprays
+    const halo = new THREE.Mesh(ribbonGeometry(line, 1.5, { lift: 0.1, tile: 6.5 }), dyeMaterial(this.dyeTex, 0.08));
     halo.renderOrder = 5;
     halo.frustumCulled = false;
     this.dyeGroup.add(halo);
@@ -471,7 +585,7 @@ export class Gates {
         const x = t.centerX(z) + side * (PISTE_HALF - 2.6);
         edge.push(new THREE.Vector3(x, t.heightAt(x, z), z));
       }
-      const m = new THREE.Mesh(ribbonGeometry(edge, 0.30, { tile: 9 }), dyeMaterial(this.dyeTex, 0.55));
+      const m = new THREE.Mesh(ribbonGeometry(edge, 0.26, { tile: 9 }), dyeMaterial(this.dyeTex, 0.4));
       m.renderOrder = 6;
       m.frustumCulled = false;
       this.dyeGroup.add(m);
@@ -657,8 +771,12 @@ export class Gates {
   }
 
   judge(g, s, px, pz, forcedReason = null) {
-    const clear = s - PANEL_CLEAR;   // metres outside the hanging panel
-    const inGate = clear >= 0 && s <= g.width && !forcedReason;
+    // `s` is metres outward from the turning pole. The reference lets a ski
+    // brush the pole (one metre inside still counts) and gives a metre of
+    // slack past the outside pole, so only a real cut or a real wide miss is
+    // a penalty.
+    const clear = s;
+    const inGate = clear >= -PASS_INSIDE && s <= g.width + PASS_OUTSIDE && !forcedReason;
     let label;
     let tone;
     let clean = false;
@@ -670,15 +788,19 @@ export class Gates {
       label = 'MISSED GATE';
       tone = 'wide';
       reason = forcedReason ?? (clear < 0 ? 'CUT INSIDE THE TURNING POLE' : 'OUTSIDE THE GATE LINE');
+    } else if (clear < 0) {
+      label = 'BRUSHED THE POLE';
+      tone = 'tight';
+      clean = true;
     } else if (clear < 0.40) {
       label = 'APEX PERFECT';
       tone = 'perfect';
       clean = true;
-    } else if (clear < 1.55) {
+    } else if (clear < 1.7) {
       label = 'CLEAN LINE';
       tone = 'clean';
       clean = true;
-    } else if (clear < 3.1) {
+    } else if (clear < 3.4) {
       label = 'TIGHT CARVE';
       tone = 'tight';
     } else {

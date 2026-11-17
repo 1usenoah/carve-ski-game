@@ -148,7 +148,7 @@ class Trail {
       fragmentShader: TRAIL_FRAG,
       uniforms: {
         uColor: { value: new THREE.Color(color).convertSRGBToLinear() },
-        uOpacity: { value: 0.85 },
+        uOpacity: { value: 0.6 },
       },
       transparent: true,
       depthWrite: false,
@@ -226,8 +226,8 @@ export class Effects {
       gravity: 2.0,
       blending: THREE.AdditiveBlending,
     });
-    this.leftTrail = new Trail(scene, def.id === 'midnight' ? '#2f4d7d' : '#6f95bf');
-    this.rightTrail = new Trail(scene, def.id === 'midnight' ? '#2f4d7d' : '#6f95bf');
+    this.leftTrail = new Trail(scene, def.id === 'midnight' ? '#33517f' : '#9db8d4');
+    this.rightTrail = new Trail(scene, def.id === 'midnight' ? '#33517f' : '#9db8d4');
     this.sprayAcc = 0;
     this.mistAcc = 0;
     this._tmp = new THREE.Vector3();

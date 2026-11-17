@@ -15,30 +15,31 @@ const _shoulders = new THREE.Vector3();
 const _chest = new THREE.Vector3();
 const _back = new THREE.Vector3();
 const _neg = new THREE.Vector3();
-const _t1 = new THREE.Vector3();
 const _t2 = new THREE.Vector3();
 const _hand = new THREE.Vector3();
+
+/* ─────────────────────────────────────────────────────────────
+ * RIDER — CarveMania proportions
+ *
+ * The reference skier is a chibi: a big round helmet that is about a third
+ * of the body height, a short round jacket, short padded legs held close
+ * together and long thin skis. Measured off the reference frames (run_b /
+ * run_c at 1280×720) the rider is ~1.3 m to the top of the helmet, the
+ * helmet is 0.41 m across, the jacket ~0.33 m wide and the skis 1.5 m.
+ * ───────────────────────────────────────────────────────────── */
+
+const HEAD_R = 0.205;
+const HIP_Y = 0.53;
+const TORSO_LEN = 0.36;
+const ANKLE_Y = 0.175;
+const SKI_LEN = 1.52;
+const SKI_OFF = 0.115;
+const THIGH = 0.19;
+const SHIN = 0.18;
 
 function limbGeometry(radius, length, radial = 10) {
   const geo = new THREE.CapsuleGeometry(radius, Math.max(0.01, length - radius * 2), 5, radial);
   geo.translate(0, -length / 2, 0);
-  return geo;
-}
-
-/** Tapered jacket: wide chest, narrow waist. */
-function jacketGeometry() {
-  const geo = new THREE.CapsuleGeometry(0.142, 0.32, 8, 18);
-  const p = geo.attributes.position;
-  const h = 0.325;
-  for (let i = 0; i < p.count; i++) {
-    const y = p.getY(i);
-    const t = clamp((y + h) / (2 * h), 0, 1);
-    const f = 0.84 + 0.42 * smooth(t, 0.18, 0.7) - 0.3 * smooth(t, 0.88, 1);
-    p.setX(i, p.getX(i) * f);
-    p.setZ(i, p.getZ(i) * f * 0.72);
-  }
-  p.needsUpdate = true;
-  geo.computeVertexNormals();
   return geo;
 }
 
@@ -47,16 +48,34 @@ function smooth(x, a, b) {
   return t * t * (3 - 2 * t);
 }
 
+/** Puffy round jacket: barrel chest, tapered waist, chibi-wide. */
+function jacketGeometry(r = 0.145, h = TORSO_LEN) {
+  const geo = new THREE.CapsuleGeometry(r, h, 8, 20);
+  const p = geo.attributes.position;
+  const half = h * 0.5 + r;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    const t = clamp((y + half) / (2 * half), 0, 1);
+    const f = 0.92 + 0.2 * smooth(t, 0.18, 0.66) - 0.24 * smooth(t, 0.88, 1);
+    p.setX(i, p.getX(i) * f);
+    p.setZ(i, p.getZ(i) * f * 0.8);
+  }
+  p.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
+
 function skiGeometry() {
-  const geo = new THREE.BoxGeometry(0.1, 0.02, 1.66, 1, 1, 12);
+  const geo = new THREE.BoxGeometry(0.1, 0.022, SKI_LEN, 1, 1, 14);
   const p = geo.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const z = p.getZ(i);
-    if (z < -0.52) {
-      const t = (-z - 0.52) / 0.31;
-      p.setY(i, p.getY(i) + t * t * 0.19);
-    } else if (z > 0.7) {
-      const t = (z - 0.7) / 0.13;
+    if (z < -0.45) {
+      const t = (-z - 0.45) / 0.31;
+      p.setY(i, p.getY(i) + t * t * 0.17);
+      p.setX(i, p.getX(i) * (1 - t * 0.3));
+    } else if (z > 0.66) {
+      const t = (z - 0.66) / 0.1;
       p.setY(i, p.getY(i) + t * t * 0.05);
     }
   }
@@ -68,18 +87,17 @@ function skiGeometry() {
 function numberTexture(num = '07') {
   const c = document.createElement('canvas');
   c.width = 128;
-  c.height = 160;
+  c.height = 128;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#f6fbff';
-  ctx.fillRect(0, 0, 128, 160);
+  ctx.fillStyle = '#f7fbff';
+  ctx.fillRect(0, 0, 128, 128);
+  ctx.fillStyle = '#d6303f';
+  ctx.fillRect(0, 0, 128, 18);
   ctx.fillStyle = '#0d1a26';
-  ctx.font = '900 86px "Rajdhani", sans-serif';
+  ctx.font = '900 72px "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(num, 64, 88);
-  ctx.fillStyle = '#c8343f';
-  ctx.fillRect(0, 0, 128, 14);
-  ctx.fillRect(0, 146, 128, 14);
+  ctx.fillText(num, 64, 78);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
@@ -91,8 +109,8 @@ function contactShadowTexture() {
   c.height = 128;
   const ctx = c.getContext('2d');
   const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
-  g.addColorStop(0, 'rgba(10,26,46,.55)');
-  g.addColorStop(0.55, 'rgba(12,30,52,.26)');
+  g.addColorStop(0, 'rgba(10,26,46,.5)');
+  g.addColorStop(0.55, 'rgba(12,30,52,.22)');
   g.addColorStop(1, 'rgba(12,30,52,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 128, 128);
@@ -101,11 +119,6 @@ function contactShadowTexture() {
   return t;
 }
 
-/**
- * Jointed skier: helmet, goggles, jacket, gloves, poles, angulated knees,
- * boots and carving skis. The legs are solved with 2-bone IK so the boots stay
- * on the skis while the body tips into the arc.
- */
 export class Rider {
   constructor(skin, { ghost = false } = {}) {
     this.skin = skin;
@@ -117,6 +130,9 @@ export class Rider {
     this.airTuck = 0;
     this.leanSmooth = 0;
     this.crouchSmooth = 0;
+    this.steerSmooth = 0;
+    this.plantSwing = 0;
+    this.plantVel = 0;
     this.build();
   }
 
@@ -136,50 +152,46 @@ export class Rider {
 
   build() {
     const s = this.skin;
-    const jacketMat = this.mat(s.jacket, { roughness: 0.48, metalness: 0.03 });
-    const jacketDark = this.mat(s.jacketDark ?? s.pants, { roughness: 0.58 });
-    const pantsMat = this.mat(s.pants, { roughness: 0.66 });
-    const pantsDark = this.mat(new THREE.Color(s.pants).multiplyScalar(0.7), { roughness: 0.7 });
-    const helmetMat = this.mat(s.helmet, { roughness: 0.2, metalness: 0.4 });
+    const jacketMat = this.mat(s.jacket, { roughness: 0.5, metalness: 0.03 });
+    const jacketDark = this.mat(s.jacketDark ?? s.jacket, { roughness: 0.58 });
+    const pantsMat = this.mat(s.pants, { roughness: 0.6 });
+    const pantsDark = this.mat(new THREE.Color(s.pants).multiplyScalar(0.78), { roughness: 0.66 });
+    const helmetMat = this.mat(s.helmet, { roughness: 0.28, metalness: 0.22 });
+    const trimMat = this.mat(s.trim ?? s.accent ?? 0xd6303f, { roughness: 0.42, metalness: 0.08 });
     const goggleMat = this.mat(s.goggles, {
       roughness: 0.08,
-      metalness: 0.65,
+      metalness: 0.55,
       emissive: s.goggles,
-      emissiveIntensity: 0.6,
+      emissiveIntensity: 0.25,
     });
-    const gloveMat = this.mat(s.glove ?? 0x121820, { roughness: 0.72 });
-    const bootMat = this.mat(s.boot ?? 0x14181f, { roughness: 0.42, metalness: 0.25 });
-    const skiMat = this.mat(s.ski, { roughness: 0.22, metalness: 0.35 });
-    const skiAccent = this.mat(s.accent, {
-      roughness: 0.3,
-      emissive: s.accent,
-      emissiveIntensity: 0.5,
-    });
-    const poleMat = this.mat(0xa8b4c0, { roughness: 0.25, metalness: 0.85 });
-    const skinMat = this.mat(0xe6b28c, { roughness: 0.82 });
-    const darkMat = this.mat(0x0a0d12, { roughness: 0.85 });
-    this.materials = { jacketMat, jacketDark, pantsMat, helmetMat, goggleMat, skiAccent };
+    const gloveMat = this.mat(s.glove ?? 0x141a22, { roughness: 0.72 });
+    const bootMat = this.mat(s.boot ?? 0x14181f, { roughness: 0.45, metalness: 0.2 });
+    const skiMat = this.mat(s.ski, { roughness: 0.24, metalness: 0.3 });
+    const accentMat = this.mat(s.accent, { roughness: 0.3, emissive: s.accent, emissiveIntensity: 0.2 });
+    const poleMat = this.mat(s.pole ?? 0xf2c230, { roughness: 0.3, metalness: 0.5 });
+    const darkMat = this.mat(0x0b0e14, { roughness: 0.8 });
+    this.materials = { jacketMat, jacketDark, pantsMat, helmetMat, goggleMat, accentMat };
 
-    // ── contact shadow blob (keeps the rider planted on the snow) ──
+    // ── contact shadow ──
     if (!this.ghost) {
       const shadow = new THREE.Mesh(
-        new THREE.PlaneGeometry(1.9, 0.72),
+        new THREE.PlaneGeometry(1.4, 0.6),
         new THREE.MeshBasicMaterial({
           map: contactShadowTexture(),
           transparent: true,
           depthWrite: false,
-          opacity: 0.75,
+          opacity: 0.7,
           toneMapped: false,
         })
       );
       shadow.rotation.x = -Math.PI / 2;
-      shadow.position.set(0.06, 0.018, 0.02);
+      shadow.position.set(0.04, 0.016, 0.03);
       shadow.renderOrder = 6;
       this.root.add(shadow);
       this.shadowBlob = shadow;
     }
 
-    // ── skis ──
+    // ── skis ── long, thin, dark with red flashes
     const skiGeo = skiGeometry();
     this.skis = [];
     this.boots = [];
@@ -187,148 +199,154 @@ export class Rider {
       const ski = new THREE.Group();
       const plate = new THREE.Mesh(skiGeo, skiMat);
       ski.add(plate);
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.026, 0.004, 1.22), skiAccent);
-      stripe.position.set(0, 0.013, 0.06);
-      ski.add(stripe);
-      const binding = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.05, 0.3), darkMat);
-      binding.position.set(0, 0.035, 0.02);
-      ski.add(binding);
-      for (const edge of [-1, 1]) {
-        const e = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.018, 1.56), poleMat);
-        e.position.set(edge * 0.05, -0.004, 0);
-        ski.add(e);
+      for (const z of [0.52, -0.5]) {
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.112, 0.006, 0.26), accentMat);
+        stripe.position.set(0, 0.012, z);
+        ski.add(stripe);
       }
-      ski.position.set(side * 0.145, 0.012, 0);
+      const binding = new THREE.Mesh(new THREE.BoxGeometry(0.082, 0.042, 0.24), darkMat);
+      binding.position.set(0, 0.031, 0.02);
+      ski.add(binding);
+      ski.position.set(side * SKI_OFF, 0.012, 0);
       this.root.add(ski);
       this.skis.push(ski);
 
-      const boot = new THREE.Mesh(new THREE.BoxGeometry(0.122, 0.175, 0.3), bootMat);
-      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.142, 0.022, 0.05), skiAccent);
-      buckle.position.set(0, 0.05, -0.08);
+      const boot = new THREE.Group();
+      const shell = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.22), bootMat);
+      shell.position.y = 0.062;
+      boot.add(shell);
+      const toe = new THREE.Mesh(new THREE.BoxGeometry(0.092, 0.07, 0.07), bootMat);
+      toe.position.set(0, 0.036, -0.13);
+      boot.add(toe);
+      const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.107, 0.014, 0.026), accentMat);
+      buckle.position.set(0, 0.092, -0.03);
       boot.add(buckle);
-      const buckle2 = buckle.clone();
-      buckle2.position.z = 0.02;
-      boot.add(buckle2);
-      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.072, 0.11, 10), bootMat);
-      cuff.position.set(0, 0.115, 0.02);
-      boot.add(cuff);
-      boot.position.set(side * 0.145, 0.115, 0.02);
+      boot.position.set(side * SKI_OFF, 0.02, 0.01);
       this.root.add(boot);
       this.boots.push(boot);
     }
 
-    // ── legs ──
+    // ── legs (padded red pants) ──
     this.thighs = [];
     this.shins = [];
-    this.thighGeo = limbGeometry(0.094, 0.46, 10);
-    this.shinGeo = limbGeometry(0.071, 0.44, 10);
+    this.thighGeo = limbGeometry(0.076, THIGH + 0.05, 12);
+    this.shinGeo = limbGeometry(0.06, SHIN + 0.05, 12);
     for (let i = 0; i < 2; i++) {
       const thigh = new THREE.Mesh(this.thighGeo, pantsMat);
-      const shin = new THREE.Mesh(this.shinGeo, pantsMat);
+      const shin = new THREE.Mesh(this.shinGeo, pantsDark);
       thigh.castShadow = shin.castShadow = true;
       this.root.add(thigh, shin);
       this.thighs.push(thigh);
       this.shins.push(shin);
     }
 
-    // ── upper body ──
+    // ── body: pelvis, jacket, hem, bib ──
     this.body = new THREE.Group();
     this.root.add(this.body);
 
-    this.pelvis = new THREE.Mesh(new THREE.CapsuleGeometry(0.122, 0.09, 5, 12), pantsMat);
-    this.pelvis.scale.set(1.02, 1, 0.82);
+    this.pelvis = new THREE.Mesh(new THREE.SphereGeometry(0.1, 14, 10), pantsMat);
+    this.pelvis.scale.set(1.25, 0.95, 1.02);
     this.body.add(this.pelvis);
 
     this.torso = new THREE.Mesh(jacketGeometry(), jacketMat);
     this.body.add(this.torso);
 
-    // jacket hem + zipper + chest stripe
-    this.hem = new THREE.Mesh(new THREE.CylinderGeometry(0.132, 0.148, 0.07, 14), jacketDark);
+    this.hem = new THREE.Mesh(new THREE.CylinderGeometry(0.138, 0.148, 0.05, 16), jacketDark);
     this.body.add(this.hem);
-    const zip = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.34, 0.01), darkMat);
-    this.body.add(zip);
-    this.zip = zip;
-    this.chestStripe = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.028, 0.012), skiAccent);
-    this.body.add(this.chestStripe);
 
-    // race bib on the back (chase camera sees this)
-    const bib = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.2, 0.25),
-      this.mat(0xffffff, { roughness: 0.7 })
-    );
+    const bib = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.17), this.mat(0xffffff, { roughness: 0.7 }));
     if (!this.ghost) bib.material.map = numberTexture('07');
-    bib.position.set(0, 0.05, 0.135);
-    bib.rotation.y = Math.PI;
     this.body.add(bib);
     this.bib = bib;
 
-    // collar + neck
-    this.collar = new THREE.Mesh(new THREE.CylinderGeometry(0.088, 0.126, 0.09, 12), jacketDark);
+    this.collar = new THREE.Mesh(new THREE.CylinderGeometry(0.076, 0.104, 0.07, 12), jacketDark);
     this.body.add(this.collar);
-    this.neck = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.06, 0.09, 8), skinMat);
-    this.body.add(this.neck);
 
-    // shoulder caps
-    this.shoulderPads = [];
-    for (const side of [-1, 1]) {
-      const pad = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), jacketMat);
-      pad.scale.set(1, 0.9, 0.95);
-      this.body.add(pad);
-      this.shoulderPads.push(pad);
-    }
-
-    // ── head ──
+    // ── head: big round yellow helmet with red bands ──
     this.head = new THREE.Group();
     this.body.add(this.head);
-    const face = new THREE.Mesh(new THREE.SphereGeometry(0.096, 16, 12), skinMat);
-    face.scale.set(0.92, 1.05, 0.96);
-    this.head.add(face);
+
+    const skinHead = new THREE.Mesh(new THREE.SphereGeometry(0.135, 18, 14), this.mat(0xe8b494, { roughness: 0.85 }));
+    skinHead.scale.set(0.95, 0.9, 0.9);
+    skinHead.position.set(0, -0.085, 0.02);
+    this.head.add(skinHead);
+
     const helmet = new THREE.Mesh(
-      new THREE.SphereGeometry(0.124, 20, 15, 0, Math.PI * 2, 0, Math.PI * 0.66),
+      new THREE.SphereGeometry(HEAD_R, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.97),
       helmetMat
     );
-    helmet.position.y = 0.018;
-    helmet.scale.set(1, 1.05, 1.06);
+    helmet.position.y = 0.008;
+    helmet.scale.set(1, 1.02, 1.03);
     this.head.add(helmet);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.118, 0.014, 6, 22), darkMat);
+
+    // red band running front → over the crown → back
+    const crownBand = new THREE.Mesh(
+      new THREE.TorusGeometry(HEAD_R * 0.995, 0.027, 8, 32, Math.PI),
+      trimMat
+    );
+    crownBand.rotation.y = Math.PI / 2;
+    crownBand.position.y = 0.008;
+    this.head.add(crownBand);
+
+    // red ring around the helmet just above the goggles
+    const ringBand = new THREE.Mesh(new THREE.TorusGeometry(HEAD_R * 0.95, 0.026, 8, 32), trimMat);
+    ringBand.rotation.x = Math.PI / 2;
+    ringBand.position.y = -0.036;
+    this.head.add(ringBand);
+
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(HEAD_R * 0.9, 0.018, 6, 26), darkMat);
     rim.rotation.x = Math.PI / 2;
-    rim.position.y = -0.028;
+    rim.position.y = -0.075;
     this.head.add(rim);
-    const goggleFrame = new THREE.Mesh(new THREE.BoxGeometry(0.185, 0.07, 0.055), darkMat);
-    goggleFrame.position.set(0, 0.012, -0.088);
-    this.head.add(goggleFrame);
-    const lens = new THREE.Mesh(new THREE.BoxGeometry(0.172, 0.052, 0.022), goggleMat);
-    lens.position.set(0, 0.014, -0.116);
-    this.head.add(lens);
-    const strap = new THREE.Mesh(new THREE.TorusGeometry(0.121, 0.013, 6, 20), darkMat);
-    strap.rotation.x = Math.PI / 2;
-    strap.position.y = 0.012;
-    this.head.add(strap);
-    const chin = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), skinMat);
-    chin.scale.set(1, 0.8, 0.9);
-    chin.position.set(0, -0.085, -0.03);
+
+    // chin strap under the helmet
+    const chin = new THREE.Mesh(new THREE.TorusGeometry(0.115, 0.012, 6, 20, Math.PI), darkMat);
+    chin.rotation.set(Math.PI / 2, 0, Math.PI);
+    chin.position.set(0, -0.16, 0.01);
     this.head.add(chin);
 
-    // ── arms ──
+    // goggles: a dark visor sector across the front only (−Z)
+    const VISOR = Math.PI * 0.5;
+    const lens = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.203, 0.203, 0.1, 24, 1, true, Math.PI - VISOR, VISOR * 2),
+      goggleMat
+    );
+    lens.position.set(0, -0.045, 0);
+    this.head.add(lens);
+    for (const dy of [0.056, -0.056]) {
+      const frame = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.206, 0.206, 0.016, 24, 1, true, Math.PI - VISOR, VISOR * 2),
+        darkMat
+      );
+      frame.position.set(0, -0.045 + dy, 0);
+      this.head.add(frame);
+    }
+
+    // ── arms: short sleeves out to the sides, red gloves, yellow poles ──
     this.arms = [];
-    this.upperGeo = limbGeometry(0.06, 0.3, 9);
-    this.foreGeo = limbGeometry(0.052, 0.28, 9);
+    this.upperGeo = limbGeometry(0.055, 0.19, 10);
+    this.foreGeo = limbGeometry(0.048, 0.17, 10);
+    this.shoulderPads = [];
     for (const side of [-1, 1]) {
+      const pad = new THREE.Mesh(new THREE.SphereGeometry(0.062, 12, 10), jacketMat);
+      this.body.add(pad);
+      this.shoulderPads.push(pad);
+
       const upper = new THREE.Mesh(this.upperGeo, jacketMat);
       const fore = new THREE.Mesh(this.foreGeo, jacketDark);
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.058, 10, 8), gloveMat);
-      hand.scale.set(1, 0.85, 1.2);
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.008, 1.16, 6), poleMat);
-      pole.geometry.translate(0, -0.58, 0);
-      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.017, 0.014, 0.12, 6), darkMat);
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 10), gloveMat);
+      hand.scale.set(0.95, 0.9, 1.15);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.0085, 0.0065, 0.92, 6), poleMat);
+      pole.geometry.translate(0, -0.46, 0);
+      const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.013, 0.09, 6), darkMat);
       pole.add(grip);
-      const basket = new THREE.Mesh(new THREE.TorusGeometry(0.042, 0.01, 5, 10), darkMat);
+      const basket = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.007, 5, 10), darkMat);
       basket.rotation.x = Math.PI / 2;
-      basket.position.y = -0.98;
+      basket.position.y = -0.8;
       pole.add(basket);
       upper.castShadow = fore.castShadow = true;
       this.body.add(upper, fore, hand, pole);
-      this.arms.push({ side, upper, fore, hand, pole, upperLen: 0.3, foreLen: 0.28 });
+      this.arms.push({ side, upper, fore, hand, pole, upperLen: 0.19, foreLen: 0.17 });
     }
 
     this.root.traverse((o) => {
@@ -349,130 +367,119 @@ export class Rider {
     this.root.rotation.y = heading;
   }
 
-  /** state: { lean: + = carve right, crouch, steer, air, grab, speed, land } */
+  /** state: { lean, crouch, steer, air, grab, speed, land } */
   update(dt, state) {
     this.time += dt;
-    const moving = clamp((state.speed ?? 0) / 18, 0, 1);
-    this.leanSmooth = damp(this.leanSmooth, state.lean, 15, dt);
-    this.crouchSmooth = damp(this.crouchSmooth, state.crouch, 9, dt);
+    const moving = clamp((state.speed ?? 0) / 16, 0, 1);
+    this.leanSmooth = damp(this.leanSmooth, clamp(state.lean ?? 0, -1.2, 1.2), 11, dt);
+    this.crouchSmooth = damp(this.crouchSmooth, clamp(state.crouch ?? 0, 0, 1), 8, dt);
+    this.steerSmooth = damp(this.steerSmooth, clamp(state.steer ?? 0, -1, 1), 12, dt);
     this.landSquash = Math.max(0, this.landSquash - dt * 3.2);
     if (state.land) this.landSquash = 1;
 
-    const L = this.leanSmooth;                    // > 0 → leaning right
+    const L = this.leanSmooth;                    // > 0 → turning right
     const crouch = clamp(this.crouchSmooth, 0, 1);
-    const squash = this.landSquash * 0.14;
+    const squash = this.landSquash * 0.1;
     const air = clamp(state.air ?? 0, 0, 1);
     this.airTuck = damp(this.airTuck, air, 6, dt);
+    this.tuckAmt = clamp((crouch - 0.45) / 0.55, 0, 1);
+    const tuck = this.tuckAmt * this.tuckAmt * (3 - 2 * this.tuckAmt);
 
-    const cosL = Math.cos(L);
-    const sinL = Math.sin(L);
-    // tuck: 0 = normal stance, 1 = flat-out aero crouch
-    const tuck = clamp((crouch - 0.4) / 0.6, 0, 1);
-    const tuckEase = tuck * tuck * (3 - 2 * tuck);
-    this.tuckAmt = tuckEase;
-    // ~82° of forward pitch at full tuck: chest almost level with the snow
-    const pitch = 0.14 + crouch * 0.34 + tuckEase * 0.95 + this.airTuck * 0.3;
-    const twist = clamp(-L * 0.3, -0.26, 0.26);
+    // pole plant: the wrists drive a swing every time the edge changes
+    this.plantVel += (-70 * this.plantSwing - 9 * this.plantVel) * dt;
+    this.plantSwing += this.plantVel * dt;
+    if (Math.abs(this.steerSmooth) > 0.55 && Math.abs(L) > 0.3) {
+      this.plantVel += Math.sign(L) * 0.9 * dt * moving;
+    }
 
-    // ── hips: angulated, only slightly displaced toward the inside ──
-    const hipY = 0.98 - crouch * 0.14 - tuckEase * 0.34 - squash - this.airTuck * 0.05;
-    const hipTilt = L * 0.34;
-    const hips = _hips.set(
-      Math.sin(hipTilt) * hipY * 0.72,
-      Math.cos(hipTilt) * hipY,
-      0.02 + crouch * 0.05 + tuckEase * 0.09
-    );
+    // ── hips and shoulders: angulated, weight shifted into the arc ──
+    const hipY = HIP_Y - crouch * 0.07 - tuck * 0.19 - squash - this.airTuck * 0.02;
+    const hips = _hips.set(L * 0.1, hipY, 0.012 + crouch * 0.025 + tuck * 0.04);
 
-    // ── shoulders: torso pitched forward and tipped deep into the arc ──
-    const torsoLen = 0.47;
-    const sy = torsoLen * Math.cos(pitch);
-    const sz = -torsoLen * Math.sin(pitch);
+    const pitch = 0.12 + crouch * 0.24 + tuck * 0.56 + this.airTuck * 0.14;
+    const torsoLen = TORSO_LEN * 0.96;
     const shoulders = _shoulders.set(
-      hips.x + sy * sinL + Math.sin(twist) * 0.015,
-      hips.y + sy * cosL,
-      hips.z + sz
+      hips.x + L * 0.095,
+      hips.y + torsoLen * Math.cos(pitch),
+      hips.z - torsoLen * Math.sin(pitch)
     );
 
-    // torso mesh spans hips → shoulders
     _dir.subVectors(shoulders, hips);
     const torsoDist = _dir.length();
-    this.torso.position.copy(hips).addScaledVector(_dir, 0.5);
-    this.torso.quaternion.setFromUnitVectors(UP, _dir.clone().normalize());
-    this.torso.scale.set(1, torsoDist / 0.6, 1);
+    const torsoDir = _dir.clone().normalize();
+    this.torso.position.copy(hips).addScaledVector(torsoDir, torsoDist * 0.5);
+    this.torso.quaternion.setFromUnitVectors(UP, torsoDir);
+    this.torso.scale.set(1, torsoDist / (TORSO_LEN + 0.29), 1);
+    this.torso.rotateZ(-L * 0.22);
 
     this.pelvis.position.copy(hips);
-    this.pelvis.position.y -= 0.03;
-    this.pelvis.rotation.z = L * 0.3;
+    this.pelvis.position.y -= 0.015;
+    this.pelvis.rotation.z = -L * 0.3;
 
-    this.hem.position.copy(hips);
-    this.hem.position.y -= 0.07;
-    this.hem.rotation.z = L * 0.32;
+    this.hem.position.copy(hips).addScaledVector(torsoDir, 0.07);
+    this.hem.quaternion.copy(this.torso.quaternion);
+    this.hem.rotateZ(-L * 0.22);
 
-    // torso-local frame: up = _dir, back = away from the chest
+    // bib on the back, seen by the chase camera
     const back = _back.set(0, Math.sin(pitch), Math.cos(pitch)).normalize();
-    back.applyAxisAngle(_zAxis, L);
-    const chest = _chest.copy(hips).addScaledVector(_dir, torsoDist * 0.62);
-    this.zip.position.copy(chest).addScaledVector(back, -0.1);
-    this.zip.quaternion.setFromUnitVectors(_zAxis, _neg.copy(back).negate());
-    this.chestStripe.position.copy(chest).addScaledVector(back, -0.102).addScaledVector(_dir, -0.04);
-    this.chestStripe.quaternion.copy(this.zip.quaternion);
-    this.bib.position.copy(hips).addScaledVector(_dir, torsoDist * 0.6).addScaledVector(back, 0.104);
+    back.applyAxisAngle(_zAxis, -L * 0.24);
+    const chest = _chest.copy(hips).addScaledVector(torsoDir, torsoDist * 0.6);
+    this.bib.position.copy(chest).addScaledVector(back, 0.156);
     this.bib.quaternion.setFromUnitVectors(_zAxis, back);
 
-    // ── head: positioned on the shoulders, counter-tilted slightly ──
+    // ── head: big helmet rides above the shoulders, counter-tilted ──
     const headPos = _c.copy(shoulders);
-    headPos.y += 0.1 - tuckEase * 0.088;
-    headPos.z += -0.005 - tuckEase * 0.07;
+    headPos.y += 0.185 - tuck * 0.05;
+    headPos.z += -0.01 - tuck * 0.03;
+    headPos.x += L * 0.03;
     this.head.position.copy(headPos);
-    // in the tuck the torso is nearly horizontal, so the neck lifts the face
-    // back up to look down the course instead of into the snow
     this.head.rotation.set(
-      pitch * 0.3 - this.airTuck * 0.1 - tuckEase * 0.74,
-      -twist * 0.7 + Math.sin(this.time * 1.3) * 0.02 * moving,
-      -L * 0.42
+      0.05 + crouch * 0.1 + tuck * 0.55 - this.airTuck * 0.1 + Math.sin(this.time * 1.7) * 0.02 * moving,
+      -L * 0.18 + this.steerSmooth * 0.06,
+      -L * 0.26
     );
-    this.neck.position.copy(shoulders).addScaledVector(_dir, 0.035);
-    this.neck.position.y += 0.02;
-    this.collar.position.copy(shoulders);
-    this.collar.rotation.z = L * 0.5;
+    this.collar.position.copy(shoulders).addScaledVector(torsoDir, -0.012);
+    this.collar.quaternion.copy(this.torso.quaternion);
 
+    // shoulder pads sit on the jacket
     for (let i = 0; i < 2; i++) {
       const side = i === 0 ? -1 : 1;
       this.shoulderPads[i].position.set(
-        shoulders.x + side * 0.135 * cosL,
-        shoulders.y + side * 0.135 * sinL - 0.05,
-        shoulders.z + 0.005
+        shoulders.x + side * 0.135,
+        shoulders.y - 0.03,
+        shoulders.z + 0.008
       );
     }
 
-    // ── legs: 2-bone IK, boots stay planted on the skis ──
+    // ── legs: 2-bone IK, boots stay on the skis, knees angle into the arc ──
     for (let i = 0; i < 2; i++) {
       const side = i === 0 ? -1 : 1;
       const hip = this.hipPos[i].set(
-        hips.x + side * 0.1 * cosL,
-        hips.y + side * 0.1 * sinL - 0.04,
-        hips.z + 0.01
+        hips.x + side * 0.085,
+        hips.y - 0.03,
+        hips.z + 0.008
       );
-      const ankleY = 0.17 + this.airTuck * 0.3;
-      const ankleZ = 0.02 - this.airTuck * 0.14;
-      const ankle = this.anklePos[i].set(side * 0.145, ankleY, ankleZ);
+      const ankle = this.anklePos[i].set(
+        side * SKI_OFF,
+        ANKLE_Y + this.airTuck * 0.14,
+        0.015 - this.airTuck * 0.05
+      );
 
-      const a = 0.46;
-      const b = 0.44;
       _dir.subVectors(ankle, hip);
       const d = Math.max(0.0001, _dir.length());
       _dir.multiplyScalar(1 / d);
-      const dC = Math.min(d, a + b - 0.004);
-      const along = (a * a - b * b + dC * dC) / (2 * dC);
-      const hgt = Math.sqrt(Math.max(0.0004, a * a - along * along));
+      const dC = Math.min(d, THIGH + SHIN - 0.004);
+      const along = (THIGH * THIGH - SHIN * SHIN + dC * dC) / (2 * dC);
+      const hgt = Math.sqrt(Math.max(0.0004, THIGH * THIGH - along * along));
       _fwd.set(0, 0, -1);
       _perp.copy(_fwd).addScaledVector(_dir, -_fwd.dot(_dir)).normalize();
       const knee = this.kneePos[i]
         .copy(hip)
         .addScaledVector(_dir, along)
         .addScaledVector(_perp, hgt);
-      // knees angle toward the inside of the turn
-      knee.x += Math.sign(L) * 0.03 * Math.abs(L);
+      // the inside knee drives across, the outside leg extends
+      knee.x += side * -Math.sign(L) * 0.025 * Math.min(1, Math.abs(L));
+      knee.z -= 0.01 * Math.abs(L);
 
       this.placeLimb(this.thighs[i], hip, knee);
       this.shins[i].position.copy(knee);
@@ -480,73 +487,72 @@ export class Rider {
       this.shins[i].quaternion.setFromUnitVectors(DOWN, _b);
     }
 
-    // ── skis & boots roll onto the carving edge ──
+    // ── skis roll onto the edge; the outside ski leads ──
+    const edgeRoll = clamp(L * 0.85 + this.steerSmooth * 0.12, -0.95, 0.95);
     for (let i = 0; i < 2; i++) {
       const side = i === 0 ? -1 : 1;
       const ski = this.skis[i];
-      const steer = state.steer ?? 0;
-      ski.rotation.z = -L * 0.82;
-      ski.rotation.y = -steer * 0.05 * side;
-      ski.position.y = 0.012 + Math.abs(Math.sin(L)) * 0.018 + this.airTuck * 0.22;
-      ski.rotation.x = -this.airTuck * 0.3;
+      const outside = Math.sign(edgeRoll) === side ? 1 : 0;
+      ski.rotation.z = -edgeRoll * (0.75 + 0.25 * outside);
+      ski.rotation.y = -this.steerSmooth * 0.05 * side;
+      ski.rotation.x = -this.airTuck * 0.28;
+      ski.position.y = 0.012 + Math.abs(Math.sin(edgeRoll)) * 0.02 + this.airTuck * 0.14;
+      ski.position.z = outside ? -edgeRoll * 0.04 : 0;
       const boot = this.boots[i];
-      boot.position.y = 0.115 + Math.abs(Math.sin(L)) * 0.01 + this.airTuck * 0.2;
-      boot.rotation.z = -L * 0.7;
-      boot.rotation.y = ski.rotation.y * 0.7;
-      boot.position.z = 0.02 - this.airTuck * 0.1;
+      boot.position.y = 0.02 + Math.abs(Math.sin(edgeRoll)) * 0.012 + this.airTuck * 0.12;
+      boot.rotation.z = -edgeRoll * 0.8;
+      boot.rotation.y = ski.rotation.y * 0.6;
+      boot.rotation.x = ski.rotation.x * 0.5;
     }
 
-    // ── arms & poles ──
+    // ── arms: held out for balance, inside hand drops, outside hand lifts ──
     const grab = state.grab ?? 0;
-    const reach = clamp(0.5 + crouch * 0.5 - this.airTuck * 0.15, 0, 1);
+    const spread = 0.5 + 0.14 * (1 - crouch) - tuck * 0.16;
     for (let i = 0; i < 2; i++) {
       const arm = this.arms[i];
       const side = arm.side;
       const shoulder = this.shoulderPos[i].set(
-        shoulders.x + side * 0.15 * cosL,
-        shoulders.y + side * 0.15 * sinL - 0.05,
-        shoulders.z + 0.005
+        shoulders.x + side * 0.135,
+        shoulders.y - 0.035,
+        shoulders.z + 0.006
       );
 
-      // upper arm hangs down, slightly forward, elbows soft — and in the tuck
-      // the elbows pull in against the ribs, forearms level in front of the chest
-      _dir.set(side * (0.3 + 0.12 * (1 - crouch)), -0.92, -0.24 - reach * 0.3).normalize();
-      _dir.applyAxisAngle(_zAxis, L * 0.45);
-      _t1.set(side * 0.18, -0.88, -0.16).normalize();
-      _dir.lerp(_t1, tuckEase * 0.92).normalize();
-      const elbow = _a.copy(shoulder).addScaledVector(_dir, arm.upperLen);
+      // out to the side, elbows soft, slightly forward of the chest
+      const out = spread * (1 - tuck * 0.6);
+      _dir.set(side * out, -0.75 - 0.1 * (1 - crouch), -0.16).normalize();
+      _dir.x -= Math.sign(L) * Math.abs(L) * 0.26 * (side === Math.sign(L) ? 1 : 0.2);
+      _dir.y += side * L * 0.2;
+      _dir.applyAxisAngle(_zAxis, -L * 0.35);
+      const elbow = _a.copy(shoulder).addScaledVector(_dir.normalize(), arm.upperLen);
       this.placeLimb(arm.upper, shoulder, elbow);
 
-      // forearm reaches forward for the pole plant
-      _b.set(side * 0.14, -0.72, -0.62 - reach * 0.12).normalize();
-      _b.applyAxisAngle(_zAxis, L * 0.4);
-      _t2.set(side * 0.06, -0.2, -0.98).normalize();
-      _b.lerp(_t2, tuckEase * 0.92).normalize();
-      if (grab > 0.01) {
-        _b.lerp(_neg.set(side * 0.5, -1.0, -0.2).normalize(), grab);
-      }
+      // forearm points forward-down to the basket
+      _b.set(side * (0.4 + 0.16 * (1 - crouch)), -0.55 - 0.35 * crouch, -0.35 - 0.25 * crouch).normalize();
+      _b.x -= Math.sign(L) * Math.abs(L) * 0.26 * (side === Math.sign(L) ? 1 : 0.2);
+      _b.y += side * L * 0.22 + this.plantSwing * 0.06;
+      _b.applyAxisAngle(_zAxis, -L * 0.3);
+      _b.normalize();
+      // in the aero tuck both forearms pull in flat along the jacket
+      _t2.set(side * 0.2, -0.1, 0.96).normalize();
+      _b.lerp(_t2, tuck * 0.85).normalize();
+      if (grab > 0.01) _b.lerp(_neg.set(side * 0.5, -1.0, -0.2).normalize(), grab);
       const hand = _hand.copy(elbow).addScaledVector(_b, arm.foreLen);
       arm.fore.position.copy(elbow);
       arm.fore.quaternion.setFromUnitVectors(DOWN, _b);
       arm.hand.position.copy(hand);
-      arm.hand.rotation.set(_b.z * 0.7, 0, -_b.x * 0.7);
+      arm.hand.rotation.set(_b.z * 0.6, 0, -_b.x * 0.6);
 
-      // pole trails back under the arm; in the tuck it lies flat along the body
+      // pole trails back and down under the hand, tip lifts in a turn
       arm.pole.position.copy(hand);
-      _b.set(side * 0.12, 0.2 + crouch * 0.1, 1.0).normalize();
-      if (tuckEase > 0.001) {
-        _t2.set(side * 0.05, 0.03, 1.0).normalize();
-        _b.lerp(_t2, tuckEase).normalize();
-      }
-      _b.applyAxisAngle(_zAxis, L * 0.35);
+      _b.set(side * 0.22, -0.42 + Math.abs(L) * 0.18 - tuck * 0.3, 0.88).normalize();
+      _b.applyAxisAngle(_zAxis, -L * 0.45);
       arm.pole.quaternion.setFromUnitVectors(DOWN, _b);
     }
 
-    // contact shadow leans with the rider
     if (this.shadowBlob) {
-      this.shadowBlob.position.x = 0.02 + L * 0.4;
-      this.shadowBlob.material.opacity = this.airTuck > 0.02 ? 0.3 : 0.75;
-      this.shadowBlob.scale.setScalar(1 - this.airTuck * 0.25);
+      this.shadowBlob.position.x = 0.02 + L * 0.25;
+      this.shadowBlob.material.opacity = this.airTuck > 0.02 ? 0.26 : 0.66;
+      this.shadowBlob.scale.setScalar(1 - this.airTuck * 0.22);
     }
 
     this.updateTails();
@@ -566,9 +572,9 @@ export class Rider {
       this.tipL = new THREE.Vector3();
       this.tipR = new THREE.Vector3();
     }
-    this.tailL.set(-0.145, 0.03, 0.78).applyMatrix4(this.root.matrixWorld);
-    this.tailR.set(0.145, 0.03, 0.78).applyMatrix4(this.root.matrixWorld);
-    this.tipL.set(-0.145, 0.03, -0.8).applyMatrix4(this.root.matrixWorld);
-    this.tipR.set(0.145, 0.03, -0.8).applyMatrix4(this.root.matrixWorld);
+    this.tailL.set(-SKI_OFF, 0.03, 0.72).applyMatrix4(this.root.matrixWorld);
+    this.tailR.set(SKI_OFF, 0.03, 0.72).applyMatrix4(this.root.matrixWorld);
+    this.tipL.set(-SKI_OFF, 0.03, -0.74).applyMatrix4(this.root.matrixWorld);
+    this.tipR.set(SKI_OFF, 0.03, -0.74).applyMatrix4(this.root.matrixWorld);
   }
 }

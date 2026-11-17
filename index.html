@@ -31,9 +31,9 @@
   body{
     margin:0; overflow:hidden; background:#060c15; color:var(--ink);
     font-family:var(--font); user-select:none; -webkit-user-select:none;
-    touch-action:none; letter-spacing:-.01em;
+    touch-action:manipulation; overscroll-behavior:none; letter-spacing:-.01em;
   }
-  canvas#app{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0;}
+  canvas#app{position:fixed; inset:0; width:100%; height:100%; display:block; z-index:0; touch-action:none;}
   .hidden{display:none !important;}
   button{font-family:inherit;}
   .num{font-family:var(--num); font-variant-numeric:tabular-nums;}
@@ -74,8 +74,18 @@
 .load-bar i{display:block; height:100%; width:8%; background:var(--red); transition:width .25s ease;}
 
 /* ───────────── 타이틀 ───────────── */
+/* The menu is a real scroll container: on a phone the brand, both run cards
+   and the foot all stack taller than the viewport, and the old fixed,
+   overflow:hidden shell cut the bottom off with no way down. */
 #title{position:fixed; inset:0; z-index:40; display:flex; flex-direction:column;
-  justify-content:space-between; padding:clamp(16px,2.6vw,38px); pointer-events:none;}
+  justify-content:flex-start; gap:clamp(14px,2.6vh,30px);
+  padding:clamp(16px,2.6vw,38px);
+  padding-bottom:calc(clamp(18px,3vh,40px) + env(safe-area-inset-bottom));
+  overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch;
+  touch-action:pan-y; overscroll-behavior:contain; pointer-events:auto;
+  scrollbar-width:none;}
+#title::-webkit-scrollbar{display:none;}
+#title > .t-mid{margin:auto 0;}
 #title::before{content:''; position:absolute; inset:0; pointer-events:none;
   background:
     linear-gradient(180deg, rgba(6,13,23,.66) 0%, rgba(6,13,23,.22) 24%, rgba(6,13,23,0) 42%, rgba(6,13,23,.35) 70%, rgba(6,13,23,.86) 100%);}
@@ -244,9 +254,12 @@
   filter:blur(1.2px); transition:opacity .35s ease;}
 
 /* ───────────── 결과 ───────────── */
-#result{position:fixed; inset:0; z-index:45; display:grid; place-items:center; padding:20px;
-  background:rgba(5,10,18,.66);}
-.res-card{width:min(420px,94vw); text-align:center;}
+#result{position:fixed; inset:0; z-index:45; display:flex; align-items:flex-start;
+  justify-content:center; padding:20px; overflow-y:auto; overflow-x:hidden;
+  -webkit-overflow-scrolling:touch; touch-action:pan-y; overscroll-behavior:contain;
+  background:rgba(5,10,18,.66); scrollbar-width:none;}
+#result::-webkit-scrollbar{display:none;}
+.res-card{width:min(420px,94vw); margin:auto; text-align:center;}
 .res-top{padding:18px 22px 14px; border-bottom:3px solid var(--red);}
 .res-kicker{font-family:var(--num); font-size:10px; letter-spacing:.34em; color:#9fb6cf;}
 .res-title{font-family:var(--num); font-style:italic; font-size:27px; font-weight:700; margin:6px 0 2px;
@@ -263,9 +276,12 @@
 .res-actions{display:flex; gap:8px; padding:14px 14px 16px;}
 
 /* ───────────── 상점 ───────────── */
-#shop{position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:18px;
-  background:rgba(4,9,16,.78); overflow:auto;}
-.shop-card{width:min(880px,96vw); max-height:92vh; overflow:auto; padding:22px 24px 20px;}
+#shop{position:fixed; inset:0; z-index:60; display:flex; align-items:flex-start;
+  justify-content:center; padding:18px; background:rgba(4,9,16,.78);
+  overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch;
+  touch-action:pan-y; overscroll-behavior:contain; scrollbar-width:none;}
+#shop::-webkit-scrollbar{display:none;}
+.shop-card{width:min(880px,96vw); margin:auto; padding:22px 24px 20px;}
 .shop-head{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:6px;}
 .shop-head h2{margin:0; font-family:var(--num); font-style:italic; font-size:24px; font-weight:700;
   letter-spacing:.02em; text-transform:uppercase;}
@@ -296,35 +312,49 @@
 .shop-note b{color:#b9cee0;}
 
 /* ───────────── 터치 ───────────── */
+/* Reference scheme: hold the left or right side of the screen — the two big
+   arrow pads are just the visible hint of that — and the crouch / brake
+   pills are explicit buttons. There is no swipe-down brake any more: a drag
+   that drifted downwards used to slam the skis sideways and blow a gate. */
 #touch{position:fixed; inset:0; z-index:36; pointer-events:none;}
 #tSurface{position:absolute; inset:0; pointer-events:auto; touch-action:none;}
 #tSurface.dragging{cursor:grabbing;}
-.tpad{position:absolute; bottom:16px; display:flex; gap:8px; pointer-events:auto;}
+.tpad{position:absolute; bottom:18px; display:flex; gap:10px; pointer-events:auto; z-index:2;}
 .tpad.right{right:16px;}
-.tpad.left{left:16px; display:none;}
-.tbtn{min-width:78px; height:52px; padding:0 14px; display:flex; flex-direction:column; align-items:center; justify-content:center;
-  overflow:hidden; background:rgba(12,21,35,.7); border:1px solid rgba(255,255,255,.22); color:#eaf6ff;
-  font-family:var(--num); font-size:13px; font-weight:700; letter-spacing:.14em; pointer-events:auto;
+.tpad.left{left:16px;}
+.tstack{position:absolute; bottom:126px; display:flex; flex-direction:column; gap:8px; pointer-events:auto; z-index:2;}
+.tstack.right{right:16px; align-items:flex-end;}
+.tstack.left{left:16px; align-items:flex-start;}
+.tbtn{min-width:74px; height:44px; padding:0 12px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  overflow:hidden; background:rgba(12,21,35,.62); border:1.5px solid rgba(255,255,255,.26); color:#eaf6ff;
+  font-family:var(--num); font-size:12px; font-weight:700; letter-spacing:.12em; pointer-events:auto;
   transition:background .1s, transform .08s; user-select:none;}
-.tbtn small{display:block; font-size:8.5px; letter-spacing:.16em; color:#93a6bd; margin-top:1px;}
+.tbtn small{display:block; font-size:8px; letter-spacing:.14em; color:#9fb2c7; margin-top:1px;}
 .tbtn b{display:block; line-height:1.1;}
 .tbtn:active,.tbtn.on{background:rgba(226,49,44,.72); border-color:#ff6a63; transform:scale(.97);}
 .tbtn.tuck.on{background:rgba(47,106,216,.8); border-color:#7aa7ff;}
+.tbtn.steer{width:94px; height:94px; min-width:0; padding:0; border-radius:50%;
+  background:rgba(9,18,30,.34); border:1.5px solid rgba(255,255,255,.4); font-size:31px;
+  text-shadow:0 2px 10px rgba(0,0,0,.55);}
+.tbtn.steer b{opacity:.92;}
+.tbtn.steer:active,.tbtn.steer.on{background:rgba(226,49,44,.5); border-color:#ff8b85; transform:scale(.95);}
 #tJump{display:none;}
 body.park #tJump{display:flex;}
 
 /* 모바일 전용 힌트 */
-#tHint{position:absolute; left:50%; bottom:84px; transform:translateX(-50%);
-  font-family:var(--num); font-size:10.5px; letter-spacing:.16em; color:#cfdfef; text-align:center;
-  white-space:nowrap; transition:opacity .6s; pointer-events:none;}
+#tHint{position:absolute; left:50%; bottom:126px; transform:translateX(-50%);
+  font-family:var(--num); font-size:10.5px; letter-spacing:.14em; color:#d7e6f6; text-align:center;
+  white-space:nowrap; transition:opacity .6s; pointer-events:none;
+  padding:5px 10px; background:rgba(9,18,30,.5); border-left:2px solid var(--red);}
 #tHint kbd{background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.2); padding:0 5px;
   font-size:10px; color:#eef4fb;}
 #tHint.fade{opacity:0;}
 
 /* 일시정지 */
-#pause{position:fixed; inset:0; z-index:55; display:grid; place-items:center; padding:20px;
-  background:rgba(4,9,16,.74);}
-.pause-card{width:min(320px,92vw); padding:24px; text-align:center;}
+#pause{position:fixed; inset:0; z-index:55; display:flex; align-items:flex-start;
+  justify-content:center; padding:20px; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  touch-action:pan-y; background:rgba(4,9,16,.74);}
+.pause-card{width:min(320px,92vw); margin:auto; padding:24px; text-align:center;}
 .pause-card h2{margin:0 0 4px; font-family:var(--num); font-style:italic; font-size:22px; font-weight:700;
   letter-spacing:.04em;}
 .pause-card p{margin:0 0 16px; font-size:12px; color:#8ba2ba;}
@@ -352,11 +382,11 @@ body.park #tJump{display:flex;}
   .course-chip{font-size:10.5px; padding:5px 8px 5px 7px; letter-spacing:.02em; max-width:64vw; overflow:hidden;}
   .course-chip .diff{display:none;}
   .icon-btn{width:32px; height:32px; font-size:12px;}
-  .hud-bl{padding:0 0 84px 12px; gap:5px;}
+  .hud-bl{padding:0 0 118px 12px; gap:5px;}
   .speedo .v{font-size:27px;}
   .speed-track{width:84px;}
   .gate-chip{font-size:10.5px; padding:3px 7px;}
-  #tHint{display:block; bottom:148px; font-size:9.5px; letter-spacing:.1em;}
+  #tHint{display:block; bottom:122px; font-size:9.5px; letter-spacing:.1em;}
   .run-card{width:100%;}
   .run-card .art{aspect-ratio:16/9;}
   .key-hint{display:none;}
@@ -365,11 +395,18 @@ body.park #tJump{display:flex;}
   .side-box{padding:8px 11px; min-width:0;}
   .side-box .val{font-size:19px;}
   .res-card{padding:0; width:min(360px,94vw);}
-  .tbtn{min-width:72px; height:50px; font-size:12px;}
+  .tbtn{min-width:70px; height:42px; font-size:11.5px;}
+  .tbtn.steer{width:86px; height:86px; min-width:0; padding:0; font-size:28px;}
+  .tpad{bottom:16px;}
+  .tstack{bottom:112px;}
+  .shop-card{padding:16px 14px 16px;}
+  .shop-grid{grid-template-columns:repeat(auto-fill, minmax(148px,1fr));}
+  .shop-head h2{font-size:20px;}
+  #shop{padding:12px;} #result{padding:14px;} #title{padding:16px 16px 24px;}
   .toast{font-size:11.5px;}
 }
 </style>
-  <script type="module" crossorigin src="/carve-ski-game/assets/index-C4Q-MUxv.js"></script>
+  <script type="module" crossorigin src="/carve-ski-game/assets/index-C_HgRl4a.js"></script>
 </head>
 <body>
 <canvas id="app"></canvas>
@@ -389,7 +426,7 @@ body.park #tJump{display:flex;}
   <div class="t-top">
     <div class="brand">
       <div class="brand-kicker"><i></i><i></i>WEBGL 3D ALPINE RACING</div>
-      <h1 class="brand-title">CARVE<em>RUSH</em><span>ALPINE · 2.0</span></h1>
+      <h1 class="brand-title">CARVE<em>RUSH</em><span>ALPINE · 3.0</span></h1>
       <div class="brand-meta">
         <div class="chip">TRACK <b id="metaMap">LARCHWOOD SUPER-G</b></div>
         <div class="chip">GATES <b>28</b></div>
@@ -481,7 +518,7 @@ body.park #tJump{display:flex;}
     <div class="air-badge hidden" id="airBadge">AIRTIME 0.0s</div>
   </div>
 
-  <div class="hud-hint" id="hudHint">HOLD <kbd>↑</kbd> TO TUCK · <kbd>←</kbd><kbd>→</kbd> TO STEER</div>
+  <div class="hud-hint" id="hudHint">HOLD <kbd>←</kbd> OR <kbd>→</kbd> TO TURN</div>
 
   <div id="center"><div id="countdown"></div><div id="goFlash"></div></div>
   <div id="judge"><div class="j-main" id="judgeMain">CLEAN LINE</div><div class="j-sub" id="judgeSub"></div></div>
@@ -557,16 +594,14 @@ body.park #tJump{display:flex;}
 <!-- 터치 -->
 <div id="touch" class="hidden">
   <div id="tSurface"></div>
-  <div class="tpad left">
-    <div class="tbtn" id="tLeft">◀</div>
-    <div class="tbtn" id="tRight">▶</div>
-  </div>
-  <div class="tpad right">
-    <div class="tbtn" id="tBrake"><b>BRAKE</b><small>HOLD</small></div>
+  <div class="tpad left"><div class="tbtn steer" id="tLeft"><b>◀</b></div></div>
+  <div class="tpad right"><div class="tbtn steer" id="tRight"><b>▶</b></div></div>
+  <div class="tstack left"><div class="tbtn jump" id="tJump"><b>AIR</b></div></div>
+  <div class="tstack right">
     <div class="tbtn tuck" id="tTuck"><b>CROUCH</b><small>HOLD</small></div>
-    <div class="tbtn jump" id="tJump"><b>AIR</b></div>
+    <div class="tbtn" id="tBrake"><b>BRAKE</b><small>HOLD</small></div>
   </div>
-  <div id="tHint">DRAG <kbd>←</kbd><kbd>→</kbd> TO CARVE · SWIPE DOWN TO STOP</div>
+  <div id="tHint">HOLD ◀ OR ▶ TO TURN</div>
 </div>
 
 </body>

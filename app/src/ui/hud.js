@@ -100,8 +100,8 @@ export class HUD {
     document.body.classList.toggle('park', mode !== 'race');
     this.setHint(
       mode === 'race'
-        ? 'HOLD <kbd>↑</kbd> TO TUCK · <kbd>←</kbd><kbd>→</kbd> TO STEER'
-        : 'HOLD <kbd>↑</kbd> TO TUCK · <kbd>SPACE</kbd> TO JUMP'
+        ? 'HOLD <kbd>←</kbd> OR <kbd>→</kbd> TO TURN · <kbd>↑</kbd> TO TUCK'
+        : 'HOLD <kbd>←</kbd> OR <kbd>→</kbd> TO TURN · <kbd>SPACE</kbd> TO JUMP'
     );
   }
 
