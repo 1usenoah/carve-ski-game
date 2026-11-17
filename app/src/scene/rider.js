@@ -291,7 +291,7 @@ export class Rider {
     // red ring around the helmet just above the goggles
     const ringBand = new THREE.Mesh(new THREE.TorusGeometry(HEAD_R * 0.95, 0.026, 8, 32), trimMat);
     ringBand.rotation.x = Math.PI / 2;
-    ringBand.position.y = -0.036;
+    ringBand.position.y = 0.012;
     this.head.add(ringBand);
 
     const rim = new THREE.Mesh(new THREE.TorusGeometry(HEAD_R * 0.9, 0.018, 6, 26), darkMat);
@@ -306,19 +306,19 @@ export class Rider {
     this.head.add(chin);
 
     // goggles: a dark visor sector across the front only (−Z)
-    const VISOR = Math.PI * 0.5;
+    const VISOR = Math.PI * 0.33;
     const lens = new THREE.Mesh(
       new THREE.CylinderGeometry(0.203, 0.203, 0.1, 24, 1, true, Math.PI - VISOR, VISOR * 2),
       goggleMat
     );
-    lens.position.set(0, -0.045, 0);
+    lens.position.set(0, -0.055, 0);
     this.head.add(lens);
-    for (const dy of [0.056, -0.056]) {
+    for (const dy of [0.05, -0.05]) {
       const frame = new THREE.Mesh(
         new THREE.CylinderGeometry(0.206, 0.206, 0.016, 24, 1, true, Math.PI - VISOR, VISOR * 2),
         darkMat
       );
-      frame.position.set(0, -0.045 + dy, 0);
+      frame.position.set(0, -0.055 + dy, 0);
       this.head.add(frame);
     }
 
