@@ -368,7 +368,7 @@ class FlagSet {
     this.cooldown = 0.30;
   }
 
-  update(dt) {
+  update(dt, time = 0) {
     this.cooldown = Math.max(0, this.cooldown - dt);
     // 2.4 Hz spring, lightly damped: clipped → over it goes → wobble → back
     const k = 228;
@@ -377,9 +377,13 @@ class FlagSet {
     this.bend = clamp(this.bend + this.bendVel * dt, -0.15, 1.25);
     this.swayVel += (-k * 0.8 * this.sway - c * 0.9 * this.swayVel) * dt;
     this.sway = clamp(this.sway + this.swayVel * dt, -0.8, 0.8);
-    // local +Z faces up the hill, so a downhill tip is a negative X rotation
-    this.group.rotation.x = -this.bend;
-    this.group.rotation.z = this.sway;
+    // local +Z faces up the hill, so a downhill tip is a negative X rotation.
+    // A slow wind breathe keeps the cloth alive the way the reference panels
+    // hang and drift on their poles.
+    const phase = (this.gate.index ?? 0) * 1.37 + (this.side === 'outside' ? 0.9 : 0);
+    const wind = Math.sin(time * 1.35 + phase) * 0.018 + Math.sin(time * 2.9 + phase * 2.1) * 0.008;
+    this.group.rotation.x = -this.bend + wind * 0.6;
+    this.group.rotation.z = this.sway + wind;
   }
 
   reset() {
@@ -860,7 +864,7 @@ export class Gates {
     const pulse = 0.5 + 0.5 * Math.sin(this.time * 4.2);
 
     for (const g of this.list) {
-      for (const f of g.flags) f.update(dt);
+      for (const f of g.flags) f.update(dt, this.time);
       if (g.mark) {
         const target = g.index === this.current ? 0.45 + 0.35 * pulse : g.index < this.current ? 0.12 : 0.22;
         g.mark.material.opacity += (target - g.mark.material.opacity) * Math.min(1, dt * 8);
